@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 
 export function SectionTitle(props: {
   title: string;
@@ -9,11 +9,69 @@ export function SectionTitle(props: {
     <div className="section-title">
       <div>
         <h2>{props.title}</h2>
-        {props.subtitle ? (
-          <p className="supporting compact">{props.subtitle}</p>
-        ) : null}
+        {props.subtitle ? <p className="supporting compact">{props.subtitle}</p> : null}
       </div>
       {props.actions ? <div className="section-actions">{props.actions}</div> : null}
+    </div>
+  );
+}
+
+export function SummaryStrip(props: {
+  label: string;
+  items: Array<{ label: string; value: ReactNode }>;
+}) {
+  return (
+    <section
+      aria-label={props.label}
+      className="summary-strip"
+      role="region"
+    >
+      {props.items.map((item) => (
+        <div className="summary-chip" key={item.label}>
+          <span>{item.label}</span>
+          <strong>{item.value}</strong>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+export function Drawer(props: {
+  title: string;
+  description?: string;
+  onClose: () => void;
+  children: ReactNode;
+  width?: "regular" | "wide";
+}) {
+  const titleId = useId();
+  const descriptionId = useId();
+
+  return (
+    <div className="drawer-backdrop" role="presentation">
+      <div
+        aria-describedby={props.description ? descriptionId : undefined}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className={
+          props.width === "wide" ? "drawer-panel drawer-panel-wide" : "drawer-panel"
+        }
+        role="dialog"
+      >
+        <div className="drawer-header">
+          <div>
+            <h2 id={titleId}>{props.title}</h2>
+            {props.description ? (
+              <p className="supporting compact" id={descriptionId}>
+                {props.description}
+              </p>
+            ) : null}
+          </div>
+          <button className="ghost-button" onClick={props.onClose} type="button">
+            Close
+          </button>
+        </div>
+        {props.children}
+      </div>
     </div>
   );
 }

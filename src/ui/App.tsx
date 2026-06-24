@@ -1,14 +1,12 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 
-import { MiniStat } from "@ui/chrome";
+import { SummaryStrip } from "@ui/chrome";
 import { InventoryView } from "@ui/InventoryView";
-import { findDefaultPackId } from "@ui/lib";
+import { apiRequest, countHealthySources, countUniqueProtocols, findDefaultPackId } from "@ui/lib";
 import { PacksView } from "@ui/PacksView";
 import { ShareModal } from "@ui/ShareModal";
 import { SourcesView } from "@ui/SourcesView";
-import { apiRequest, countHealthySources, countUniqueProtocols } from "@ui/lib";
-import type { Screen } from "@ui/types";
-import { initialDashboard, type DashboardState, type ShareTarget } from "@ui/types";
+import { initialDashboard, type DashboardState, type Screen, type ShareTarget } from "@ui/types";
 
 export function App() {
   const [authState, setAuthState] = useState<
@@ -27,9 +25,9 @@ export function App() {
 
   const shellMetrics = useMemo(
     () => [
-      { label: "Inventory", value: dashboard.proxies.length },
+      { label: "Proxies", value: dashboard.proxies.length },
       { label: "Protocols", value: countUniqueProtocols(dashboard.proxies) },
-      { label: "Healthy feeds", value: countHealthySources(dashboard.sources) },
+      { label: "Healthy Feeds", value: countHealthySources(dashboard.sources) },
       { label: "Packs", value: dashboard.subscriptions.length },
     ],
     [dashboard.proxies, dashboard.sources, dashboard.subscriptions.length],
@@ -43,7 +41,7 @@ export function App() {
   }
 
   async function loadDashboard() {
-    setStatusMessage("Loading dashboard...");
+    setStatusMessage("Loading workspace...");
     const response = await fetch("/api/dashboard", {
       credentials: "include",
     });
@@ -110,11 +108,10 @@ export function App() {
     return (
       <main className="login-shell">
         <section className="login-panel">
-          <p className="eyebrow">ProxyManager</p>
+          <p className="eyebrow">Proxy Manager</p>
           <h1>Admin Access</h1>
           <p className="supporting">
-            Sign in to manage imported proxy links, remote subscriptions, and
-            custom export packs.
+            Sign in to manage imported proxy links, upstream feeds, and custom packs.
           </p>
           <form className="stack-form" onSubmit={handleLogin}>
             <label>
@@ -157,56 +154,51 @@ export function App() {
   }
 
   return (
-    <main className="workspace-shell">
-      <aside className="workspace-sidebar">
-        <div className="sidebar-block">
+    <main className="app-shell">
+      <aside className="workspace-rail">
+        <div className="rail-brand">
           <p className="eyebrow">Cloudflare Worker</p>
-          <h1>Proxy Command Center</h1>
-          <p className="supporting">
-            Inventory, remote feeds, and custom packs now live in one
-            workspace instead of three disconnected columns.
+          <h1>Proxy Manager</h1>
+          <p className="supporting compact">
+            A cleaner control plane for inventory, remote feeds, and curated exports.
           </p>
         </div>
 
-        <nav aria-label="Workspace sections" className="sidebar-nav">
-          {[
+        <nav aria-label="Primary Navigation" className="rail-nav">
+          {([
             ["inventory", "Inventory"],
             ["sources", "Sources"],
             ["packs", "Packs"],
-          ].map(([id, label]) => (
+          ] as const).map(([id, label]) => (
             <button
-              className={screen === id ? "nav-button nav-button-active" : "nav-button"}
+              className={screen === id ? "rail-link rail-link-active" : "rail-link"}
               key={id}
-              onClick={() => setScreen(id as Screen)}
+              onClick={() => setScreen(id)}
               type="button"
             >
-              <span>{label}</span>
+              {label}
             </button>
           ))}
         </nav>
 
-        <div className="sidebar-metrics">
-          {shellMetrics.map((metric) => (
-            <MiniStat key={metric.label} label={metric.label} value={metric.value} />
-          ))}
-        </div>
-
-        <div className="sidebar-footer">
+        <div className="rail-footer">
           <p className="status-line">{statusMessage}</p>
-          <button className="ghost-button ghost-button-light" onClick={() => void handleLogout()} type="button">
-            Sign out
+          <button className="ghost-button" onClick={() => void handleLogout()} type="button">
+            Sign Out
           </button>
         </div>
       </aside>
 
-      <section className="workspace-main">
-        <header className="workspace-header">
+      <section className="app-main">
+        <header className="page-header">
           <div>
-            <p className="eyebrow">Workspace</p>
+            <p className="eyebrow">{screenEyebrow(screen)}</p>
             <h2>{screenTitle(screen)}</h2>
             <p className="supporting">{screenDescription(screen)}</p>
           </div>
         </header>
+
+        <SummaryStrip label="Workspace Overview" items={shellMetrics} />
 
         {screen === "inventory" ? (
           <InventoryView
@@ -251,8 +243,8 @@ function LoadingShell({ message }: { message: string }) {
   return (
     <main className="login-shell">
       <section className="login-panel">
-        <p className="eyebrow">ProxyManager</p>
-        <h1>Booting control plane</h1>
+        <p className="eyebrow">Proxy Manager</p>
+        <h1>Booting Workspace</h1>
         <p className="supporting">{message}</p>
       </section>
     </main>
@@ -261,14 +253,26 @@ function LoadingShell({ message }: { message: string }) {
 
 function screenDescription(screen: Screen): string {
   if (screen === "inventory") {
-    return "Search imported nodes, rename them, and manage share-ready metadata.";
+    return "Search nodes, edit share-facing metadata, and import fresh links from a drawer.";
   }
 
   if (screen === "sources") {
-    return "Register upstream subscriptions and monitor sync health in one list.";
+    return "Monitor upstream subscriptions, inspect sync health, and add new sources without leaving the list.";
   }
 
-  return "Build packs, append inventory nodes, import fresh links, and share exports in one place.";
+  return "Browse packs, adjust content, and manage export flows from one split workspace.";
+}
+
+function screenEyebrow(screen: Screen): string {
+  if (screen === "inventory") {
+    return "Inventory";
+  }
+
+  if (screen === "sources") {
+    return "Remote Feeds";
+  }
+
+  return "Custom Packs";
 }
 
 function screenTitle(screen: Screen): string {
@@ -277,8 +281,8 @@ function screenTitle(screen: Screen): string {
   }
 
   if (screen === "sources") {
-    return "Remote Sources";
+    return "Source Health";
   }
 
-  return "Custom Packs";
+  return "Pack Workspace";
 }

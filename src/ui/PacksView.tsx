@@ -1,6 +1,7 @@
 import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import {
+  Drawer,
   EmptyPanel,
   MiniStat,
   ProtocolBadge,
@@ -50,7 +51,8 @@ export function PacksView(props: PacksViewProps) {
   const [contentQuery, setContentQuery] = useState("");
   const [contentProtocolFilter, setContentProtocolFilter] = useState("all");
   const [contentTagFilter, setContentTagFilter] = useState("all");
-  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
+  const [showImportDrawer, setShowImportDrawer] = useState(false);
   const [importForm, setImportForm] = useState({
     content: "",
     kind: "raw" as "clash" | "raw" | "sing-box",
@@ -97,10 +99,7 @@ export function PacksView(props: PacksViewProps) {
   }, [subscriptionDetail?.subscription.defaultFormat]);
 
   useEffect(() => {
-    if (
-      activeTab !== "share" ||
-      !subscriptionDetail
-    ) {
+    if (activeTab !== "share" || !subscriptionDetail) {
       return;
     }
 
@@ -146,22 +145,24 @@ export function PacksView(props: PacksViewProps) {
     subscriptionDetail?.nodes,
   ]);
 
-  const pickerNodes = useMemo(() => {
-    return props.dashboard.proxies.filter((proxy) => {
-      const matchesQuery =
-        deferredPickerQuery.trim().length === 0 ||
-        proxySearchText(proxy).includes(deferredPickerQuery.trim().toLowerCase());
-      const matchesProtocol =
-        pickerProtocolFilter === "all" || proxy.protocol === pickerProtocolFilter;
-      const matchesTag = matchesTagFilter(proxy.tags, pickerTagFilter);
-      return matchesQuery && matchesProtocol && matchesTag;
-    });
-  }, [
-    deferredPickerQuery,
-    pickerProtocolFilter,
-    pickerTagFilter,
-    props.dashboard.proxies,
-  ]);
+  const pickerNodes = useMemo(
+    () =>
+      props.dashboard.proxies.filter((proxy) => {
+        const matchesQuery =
+          deferredPickerQuery.trim().length === 0 ||
+          proxySearchText(proxy).includes(deferredPickerQuery.trim().toLowerCase());
+        const matchesProtocol =
+          pickerProtocolFilter === "all" || proxy.protocol === pickerProtocolFilter;
+        const matchesTag = matchesTagFilter(proxy.tags, pickerTagFilter);
+        return matchesQuery && matchesProtocol && matchesTag;
+      }),
+    [
+      deferredPickerQuery,
+      pickerProtocolFilter,
+      pickerTagFilter,
+      props.dashboard.proxies,
+    ],
+  );
 
   async function loadSubscriptionDetail(subscriptionId: string) {
     const detail = await apiRequest<SubscriptionDetail>(
@@ -196,7 +197,7 @@ export function PacksView(props: PacksViewProps) {
   async function handleCreatePack(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (newPackNodeIds.length === 0) {
-      props.onStatusChange("Pick at least one proxy inside Packs before creating a pack.");
+      props.onStatusChange("Pick at least one proxy before creating a pack.");
       return;
     }
 
@@ -222,6 +223,7 @@ export function PacksView(props: PacksViewProps) {
         name: "",
       });
       setNewPackNodeIds([]);
+      setShowCreateDrawer(false);
       setActiveTab("content");
       await props.onRefreshDashboard();
       props.onSelectSubscription(response.subscription.id);
@@ -288,7 +290,7 @@ export function PacksView(props: PacksViewProps) {
         method: "POST",
       });
       setImportForm({ content: "", kind: "raw" });
-      setShowImportPanel(false);
+      setShowImportDrawer(false);
       await loadSubscriptionDetail(subscriptionDetail.subscription.id);
       await props.onRefreshDashboard();
       props.onStatusChange("Links imported into the pack.");
@@ -342,170 +344,115 @@ export function PacksView(props: PacksViewProps) {
   }
 
   return (
-    <>
-      <div className="packs-layout">
-        <section className="workspace-panel packs-sidebar">
-          <SectionTitle
-            title="Packs"
-            subtitle="Create, search, and switch between custom subscriptions."
-            actions={
-              <MiniStat
-                label="Packs"
-                tone="accent"
-                value={props.dashboard.subscriptions.length}
-              />
-            }
-          />
+    <section aria-label="Packs Workspace" className="page-section" role="region">
+      <SectionTitle
+        title="Packs"
+        subtitle="Browse custom subscriptions first, then open drawers only when you need to create, import, or append."
+        actions={
+          <button
+            className="primary-button"
+            onClick={() => setShowCreateDrawer(true)}
+            type="button"
+          >
+            New Pack
+          </button>
+        }
+      />
 
-          <form className="stack-form create-pack-form" onSubmit={handleCreatePack}>
-            <label>
-              <span>Pack name</span>
-              <input
-                onChange={(event) =>
-                  setNewPackForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                placeholder="Travel Pack"
-                value={newPackForm.name}
-              />
-            </label>
-            <label>
-              <span>Description</span>
-              <textarea
-                onChange={(event) =>
-                  setNewPackForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="Regional split, media-safe, work-safe..."
-                rows={3}
-                value={newPackForm.description}
-              />
-            </label>
-            <label>
-              <span>Default export</span>
-              <select
-                onChange={(event) =>
-                  setNewPackForm((current) => ({
-                    ...current,
-                    defaultFormat: event.target.value as ExportFormat,
-                  }))
-                }
-                value={newPackForm.defaultFormat}
-              >
-                <option value="clash-meta">Clash.Meta</option>
-                <option value="sing-box">sing-box</option>
-                <option value="raw">Raw</option>
-              </select>
-            </label>
-            <div className="selection-chip-row">
-              <span className="selection-chip">{newPackNodeIds.length} proxies selected</span>
-              <button
-                className="ghost-button"
-                onClick={() => openPicker("create")}
-                type="button"
-              >
-                Pick proxies
-              </button>
-            </div>
-            {newPackNodeIds.length > 0 ? (
-              <div className="selection-preview">
-                {props.dashboard.proxies
-                  .filter((proxy) => newPackNodeIds.includes(proxy.id))
-                  .slice(0, 4)
-                  .map((proxy) => (
-                    <span className="selection-preview-chip" key={proxy.id}>
-                      {proxy.displayName}
-                    </span>
-                  ))}
-              </div>
-            ) : null}
-            <button className="primary-button" type="submit">
-              Create pack
-            </button>
-          </form>
-
-          <label className="toolbar-field">
-            <span className="field-label">Search packs</span>
+      <div className="packs-grid">
+        <div className="panel">
+          <label className="toolbar-field toolbar-field-wide">
+            <span className="field-label">Search Packs</span>
             <input
               onChange={(event) => setPackListQuery(event.target.value)}
-              placeholder="Filter by pack name or format"
+              placeholder="Filter by name or export format"
               value={packListQuery}
             />
           </label>
 
-          <div className="pack-list">
-            {filteredPacks.map((subscription) => (
-              <button
-                className={
-                  subscription.id === props.activeSubscriptionId
-                    ? "pack-list-row pack-list-row-active"
-                    : "pack-list-row"
-                }
-                key={subscription.id}
-                onClick={() => props.onSelectSubscription(subscription.id)}
-                type="button"
-              >
-                <div>
-                  <strong>{subscription.name}</strong>
-                  <p className="supporting compact">{subscription.description || "No description"}</p>
-                </div>
-                <div className="pack-list-meta">
-                  <span>{subscription.itemCount} nodes</span>
-                  <span>{subscription.defaultFormat}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
+          {filteredPacks.length === 0 ? (
+            <EmptyPanel
+              title="No packs found"
+              description="Create a new pack or clear the search to browse the full list."
+            />
+          ) : (
+            <div className="data-list">
+              {filteredPacks.map((subscription) => {
+                const isActive = subscription.id === props.activeSubscriptionId;
 
-        <section className="workspace-panel packs-workspace">
+                return (
+                  <div
+                    className={isActive ? "list-row list-row-active" : "list-row"}
+                    key={subscription.id}
+                  >
+                    <button
+                      className="list-row-button"
+                      onClick={() => props.onSelectSubscription(subscription.id)}
+                      type="button"
+                    >
+                      <div className="row-heading">
+                        <strong>{subscription.name}</strong>
+                        <span className="inline-note">{subscription.defaultFormat}</span>
+                      </div>
+                      <p className="supporting compact">
+                        {subscription.description || "No description"}
+                      </p>
+                      <p className="supporting compact">
+                        {subscription.itemCount} nodes · Updated{" "}
+                        {formatTime(subscription.updatedAt)}
+                      </p>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="panel detail-pane">
           {selectedSubscription && subscriptionDetail ? (
             <>
-              <header className="workspace-headline">
+              <div className="detail-header">
                 <div>
-                  <p className="eyebrow">Custom Pack</p>
+                  <p className="eyebrow">Selected Pack</p>
                   <h2>{selectedSubscription.name}</h2>
                   <p className="supporting">
-                    {selectedSubscription.description || "No description yet"} ·{" "}
+                    {selectedSubscription.description || "No description"} ·{" "}
                     {selectedSubscription.itemCount} nodes · Updated{" "}
                     {formatTime(selectedSubscription.updatedAt)}
                   </p>
                 </div>
                 <div className="headline-actions">
                   <button
-                    className="primary-button"
+                    className="ghost-button"
                     onClick={() => openPicker("append")}
                     type="button"
                   >
-                    Add proxies
+                    Add Proxies
                   </button>
                   <button
                     className="ghost-button"
-                    onClick={() => setShowImportPanel((current) => !current)}
+                    onClick={() => setShowImportDrawer(true)}
                     type="button"
                   >
-                    Import links
+                    Import Links
                   </button>
                 </div>
-              </header>
+              </div>
 
-              <div aria-label="Pack tabs" className="tab-strip" role="tablist">
-                {[
+              <div aria-label="Pack Tabs" className="tab-strip" role="tablist">
+                {([
                   ["content", "Content"],
                   ["share", "Share"],
                   ["settings", "Settings"],
-                ].map(([tabId, label]) => (
+                ] as const).map(([tabId, label]) => (
                   <button
                     aria-selected={activeTab === tabId}
                     className={
                       activeTab === tabId ? "tab-button tab-button-active" : "tab-button"
                     }
                     key={tabId}
-                    onClick={() => setActiveTab(tabId as PackTab)}
+                    onClick={() => setActiveTab(tabId)}
                     role="tab"
                     type="button"
                   >
@@ -516,174 +463,118 @@ export function PacksView(props: PacksViewProps) {
 
               {activeTab === "content" ? (
                 <div className="workspace-stack">
-                  {showImportPanel ? (
-                    <section className="subpanel subpanel-muted">
-                      <SectionTitle
-                        title="Import links into this pack"
-                        subtitle="Bring in fresh nodes without leaving the current pack workspace."
-                      />
-                      <form className="stack-form" onSubmit={handleImportIntoPack}>
-                        <label>
-                          <span>Input format</span>
-                          <select
-                            onChange={(event) =>
-                              setImportForm((current) => ({
-                                ...current,
-                                kind: event.target.value as "clash" | "raw" | "sing-box",
-                              }))
-                            }
-                            value={importForm.kind}
-                          >
-                            <option value="raw">Raw URI / base64 text</option>
-                            <option value="clash">Clash YAML</option>
-                            <option value="sing-box">sing-box JSON</option>
-                          </select>
-                        </label>
-                        <label>
-                          <span>Payload</span>
-                          <textarea
-                            onChange={(event) =>
-                              setImportForm((current) => ({
-                                ...current,
-                                content: event.target.value,
-                              }))
-                            }
-                            rows={5}
-                            value={importForm.content}
-                          />
-                        </label>
-                        <div className="toolbar-actions">
-                          <button className="primary-button" type="submit">
-                            Import into this pack
-                          </button>
-                          <button
-                            className="ghost-button"
-                            onClick={() => setShowImportPanel(false)}
-                            type="button"
-                          >
-                            Close
-                          </button>
-                        </div>
-                      </form>
-                    </section>
-                  ) : null}
-
-                  <section className="subpanel">
-                    <SectionTitle
-                      title="Pack content"
-                      subtitle="Search and compare duplicate names by tag, source, and protocol."
-                      actions={
-                        <div className="mini-stat-grid">
-                          <MiniStat label="Nodes" value={subscriptionDetail.items.length} />
-                          <MiniStat
-                            label="Protocols"
-                            tone="accent"
-                            value={getProtocolOptions(subscriptionDetail.nodes).length}
-                          />
-                        </div>
-                      }
-                    />
-
-                    <div className="toolbar-row">
-                      <label className="toolbar-field toolbar-field-wide">
-                        <span className="field-label">Search</span>
-                        <input
-                          onChange={(event) => setContentQuery(event.target.value)}
-                          placeholder="Search nodes by name, tag, source, or protocol"
-                          value={contentQuery}
+                  <SectionTitle
+                    title="Pack Content"
+                    subtitle="Duplicate names are distinguished by source, protocol, and tags."
+                    actions={
+                      <div className="mini-stat-grid">
+                        <MiniStat label="Nodes" value={subscriptionDetail.items.length} />
+                        <MiniStat
+                          label="Protocols"
+                          tone="accent"
+                          value={getProtocolOptions(subscriptionDetail.nodes).length}
                         />
-                      </label>
-                      <label className="toolbar-field">
-                        <span className="field-label">Protocol</span>
-                        <select
-                          onChange={(event) => setContentProtocolFilter(event.target.value)}
-                          value={contentProtocolFilter}
-                        >
-                          <option value="all">All protocols</option>
-                          {getProtocolOptions(subscriptionDetail.nodes).map((protocol) => (
-                            <option key={protocol} value={protocol}>
-                              {protocol}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="toolbar-field">
-                        <span className="field-label">Tag</span>
-                        <select
-                          onChange={(event) => setContentTagFilter(event.target.value)}
-                          value={contentTagFilter}
-                        >
-                          <option value="all">All tags</option>
-                          {getTagOptions(subscriptionDetail.nodes).map((tag) => (
-                            <option key={tag} value={tag}>
-                              {tag}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    {filteredPackNodes.length === 0 ? (
-                      <EmptyPanel
-                        title="No pack nodes match this filter"
-                        description="Reset the filters or add more proxies from inventory."
-                      />
-                    ) : (
-                      <div className="data-list">
-                        {subscriptionDetail.items
-                          .filter((item) =>
-                            filteredPackNodes.some((node) => node.id === item.proxyId),
-                          )
-                          .map((item) => {
-                            const shareTarget = openShareTarget(
-                              item.proxy.shareUri,
-                              `${item.proxy.displayName} URI`,
-                            );
-
-                            return (
-                              <article className="data-row" key={item.id}>
-                                <div className="data-row-main">
-                                  <div className="identity-block">
-                                    <div className="identity-heading">
-                                      <h3>{item.proxy.displayName}</h3>
-                                      <ProtocolBadge value={item.proxy.protocol} />
-                                    </div>
-                                    <p className="supporting compact">
-                                      Source {item.proxy.sourceName} · Updated{" "}
-                                      {formatTime(item.proxy.updatedAt)}
-                                    </p>
-                                    <div className="token-row">
-                                      <TagTokens tags={item.proxy.tags} fallback="No tags" />
-                                    </div>
-                                  </div>
-                                  <div className="row-actions">
-                                    <button
-                                      className="ghost-button"
-                                      disabled={!shareTarget}
-                                      onClick={() => {
-                                        if (shareTarget) {
-                                          props.onOpenShare(shareTarget);
-                                        }
-                                      }}
-                                      type="button"
-                                    >
-                                      Share
-                                    </button>
-                                    <button
-                                      className="ghost-button"
-                                      onClick={() => void handleRemoveItem(item.id)}
-                                      type="button"
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                </div>
-                              </article>
-                            );
-                          })}
                       </div>
-                    )}
-                  </section>
+                    }
+                  />
+
+                  <div className="toolbar-row">
+                    <label className="toolbar-field toolbar-field-wide">
+                      <span className="field-label">Search</span>
+                      <input
+                        onChange={(event) => setContentQuery(event.target.value)}
+                        placeholder="Search nodes by name, tag, source, or protocol"
+                        value={contentQuery}
+                      />
+                    </label>
+                    <label className="toolbar-field">
+                      <span className="field-label">Protocol</span>
+                      <select
+                        onChange={(event) => setContentProtocolFilter(event.target.value)}
+                        value={contentProtocolFilter}
+                      >
+                        <option value="all">All protocols</option>
+                        {getProtocolOptions(subscriptionDetail.nodes).map((protocol) => (
+                          <option key={protocol} value={protocol}>
+                            {protocol}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="toolbar-field">
+                      <span className="field-label">Tag</span>
+                      <select
+                        onChange={(event) => setContentTagFilter(event.target.value)}
+                        value={contentTagFilter}
+                      >
+                        <option value="all">All tags</option>
+                        {getTagOptions(subscriptionDetail.nodes).map((tag) => (
+                          <option key={tag} value={tag}>
+                            {tag}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  {filteredPackNodes.length === 0 ? (
+                    <EmptyPanel
+                      title="No pack nodes match this filter"
+                      description="Reset the filters or add more proxies from inventory."
+                    />
+                  ) : (
+                    <div className="data-list">
+                      {subscriptionDetail.items
+                        .filter((item) =>
+                          filteredPackNodes.some((node) => node.id === item.proxyId),
+                        )
+                        .map((item) => {
+                          const shareTarget = openShareTarget(
+                            item.proxy.shareUri,
+                            `${item.proxy.displayName} URI`,
+                          );
+
+                          return (
+                            <div className="list-row" key={item.id}>
+                              <div className="list-row-body">
+                                <div className="row-heading">
+                                  <strong>{item.proxy.displayName}</strong>
+                                  <ProtocolBadge value={item.proxy.protocol} />
+                                </div>
+                                <p className="supporting compact">
+                                  {item.proxy.sourceName} · Updated{" "}
+                                  {formatTime(item.proxy.updatedAt)}
+                                </p>
+                                <div className="token-row">
+                                  <TagTokens tags={item.proxy.tags} fallback="No tags" />
+                                </div>
+                              </div>
+                              <div className="row-actions">
+                                <button
+                                  className="ghost-button"
+                                  disabled={!shareTarget}
+                                  onClick={() => {
+                                    if (shareTarget) {
+                                      props.onOpenShare(shareTarget);
+                                    }
+                                  }}
+                                  type="button"
+                                >
+                                  Share
+                                </button>
+                                <button
+                                  className="ghost-button"
+                                  onClick={() => void handleRemoveItem(item.id)}
+                                  type="button"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -691,8 +582,8 @@ export function PacksView(props: PacksViewProps) {
                 <div className="workspace-stack">
                   <section className="subpanel">
                     <SectionTitle
-                      title="Share links"
-                      subtitle="Copy URLs, open QR codes, or inspect the exact exported payload."
+                      title="Share Links"
+                      subtitle="Copy the public URL, open a QR code, or preview the exact payload."
                     />
                     <div className="share-grid">
                       {(["clash-meta", "raw", "sing-box"] as ExportFormat[]).map((format) => {
@@ -702,13 +593,14 @@ export function PacksView(props: PacksViewProps) {
                         );
                         return (
                           <article className="share-card" key={format}>
-                            <div>
+                            <div className="row-heading">
                               <strong>{format}</strong>
-                              <p className="share-link">{url}</p>
+                              <span className="inline-note">public</span>
                             </div>
+                            <p className="share-link">{url}</p>
                             <div className="share-card-actions">
                               <button
-                                className="primary-button"
+                                className="ghost-button"
                                 onClick={() => void copyText(url)}
                                 type="button"
                               >
@@ -742,11 +634,11 @@ export function PacksView(props: PacksViewProps) {
 
                   <section className="subpanel">
                     <SectionTitle
-                      title="Export preview"
-                      subtitle="Inspect the exact payload clients will receive for the selected profile."
+                      title="Export Preview"
+                      subtitle="Inspect the exact response clients receive for the selected format."
                       actions={
                         <label className="toolbar-field">
-                          <span className="field-label">Profile</span>
+                          <span className="field-label">Format</span>
                           <select
                             onChange={(event) =>
                               setExportFormat(event.target.value as ExportFormat)
@@ -780,47 +672,176 @@ export function PacksView(props: PacksViewProps) {
               ) : null}
 
               {activeTab === "settings" ? (
-                <section className="subpanel">
+                <div className="workspace-stack">
                   <SectionTitle
-                    title="Pack settings"
-                    subtitle="Metadata, defaults, and token rotation live here."
+                    title="Settings"
+                    subtitle="Metadata stays readable here even when editing is limited by the current API."
                   />
-                  <div className="settings-grid">
-                    <MiniStat label="Name" value={selectedSubscription.name} />
-                    <MiniStat label="Default export" value={selectedSubscription.defaultFormat} />
-                    <MiniStat label="Nodes" value={selectedSubscription.itemCount} />
-                    <MiniStat label="Updated" value={formatTime(selectedSubscription.updatedAt)} />
+                  <div className="detail-meta">
+                    <div>
+                      <span className="detail-label">Default export</span>
+                      <p className="detail-copy">{selectedSubscription.defaultFormat}</p>
+                    </div>
+                    <div>
+                      <span className="detail-label">Nodes</span>
+                      <p className="detail-copy">{selectedSubscription.itemCount}</p>
+                    </div>
+                    <div>
+                      <span className="detail-label">Updated</span>
+                      <p className="detail-copy">{formatTime(selectedSubscription.updatedAt)}</p>
+                    </div>
                   </div>
-                  <div className="settings-card">
-                    <h3>Description</h3>
-                    <p className="supporting">
+                  <div className="detail-block">
+                    <span className="detail-label">Description</span>
+                    <p className="detail-copy">
                       {selectedSubscription.description || "No description yet."}
                     </p>
                   </div>
-                  <div className="settings-card">
-                    <h3>Share token</h3>
+                  <div className="detail-block">
+                    <span className="detail-label">Share token</span>
                     <p className="mono-block">{selectedSubscription.shareToken}</p>
-                    <div className="toolbar-actions">
-                      <button
-                        className="primary-button"
-                        onClick={() => void handleRotateShareToken()}
-                        type="button"
-                      >
-                        Rotate token
-                      </button>
-                    </div>
+                    <button
+                      className="ghost-button"
+                      onClick={() => void handleRotateShareToken()}
+                      type="button"
+                    >
+                      Rotate Token
+                    </button>
                   </div>
-                </section>
+                </div>
               ) : null}
             </>
           ) : (
             <EmptyPanel
-              title="Select a pack"
-              description="Create a new pack on the left or choose an existing one to manage its content, sharing, and settings."
+              title="No pack selected"
+              description="Choose an existing pack or create a new one from the drawer."
             />
           )}
-        </section>
+        </div>
       </div>
+
+      {showCreateDrawer ? (
+        <Drawer
+          description="Name the pack, choose its default export, and attach inventory nodes before saving."
+          onClose={() => setShowCreateDrawer(false)}
+          title="Create Pack"
+          width="wide"
+        >
+          <form className="stack-form" onSubmit={handleCreatePack}>
+            <label>
+              <span>Pack Name</span>
+              <input
+                onChange={(event) =>
+                  setNewPackForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Travel Pack"
+                value={newPackForm.name}
+              />
+            </label>
+            <label>
+              <span>Description</span>
+              <textarea
+                onChange={(event) =>
+                  setNewPackForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder="Regional split, low-latency routes, backup nodes..."
+                rows={4}
+                value={newPackForm.description}
+              />
+            </label>
+            <label>
+              <span>Default Export</span>
+              <select
+                onChange={(event) =>
+                  setNewPackForm((current) => ({
+                    ...current,
+                    defaultFormat: event.target.value as ExportFormat,
+                  }))
+                }
+                value={newPackForm.defaultFormat}
+              >
+                <option value="clash-meta">Clash.Meta</option>
+                <option value="sing-box">sing-box</option>
+                <option value="raw">Raw</option>
+              </select>
+            </label>
+            <div className="selection-chip-row">
+              <span className="selection-chip">{newPackNodeIds.length} proxies selected</span>
+              <button
+                className="ghost-button"
+                onClick={() => openPicker("create")}
+                type="button"
+              >
+                Pick Proxies
+              </button>
+            </div>
+            {newPackNodeIds.length > 0 ? (
+              <div className="selection-preview">
+                {props.dashboard.proxies
+                  .filter((proxy) => newPackNodeIds.includes(proxy.id))
+                  .slice(0, 6)
+                  .map((proxy) => (
+                    <span className="selection-preview-chip" key={proxy.id}>
+                      {proxy.displayName}
+                    </span>
+                  ))}
+              </div>
+            ) : null}
+            <button className="primary-button" type="submit">
+              Create Pack
+            </button>
+          </form>
+        </Drawer>
+      ) : null}
+
+      {showImportDrawer && subscriptionDetail ? (
+        <Drawer
+          description="Bring fresh nodes into the selected pack without leaving the current workspace."
+          onClose={() => setShowImportDrawer(false)}
+          title="Import Links Into Pack"
+        >
+          <form className="stack-form" onSubmit={handleImportIntoPack}>
+            <label>
+              <span>Input format</span>
+              <select
+                onChange={(event) =>
+                  setImportForm((current) => ({
+                    ...current,
+                    kind: event.target.value as "clash" | "raw" | "sing-box",
+                  }))
+                }
+                value={importForm.kind}
+              >
+                <option value="raw">Raw URI / base64 text</option>
+                <option value="clash">Clash YAML</option>
+                <option value="sing-box">sing-box JSON</option>
+              </select>
+            </label>
+            <label>
+              <span>Payload</span>
+              <textarea
+                onChange={(event) =>
+                  setImportForm((current) => ({
+                    ...current,
+                    content: event.target.value,
+                  }))
+                }
+                rows={8}
+                value={importForm.content}
+              />
+            </label>
+            <button className="primary-button" type="submit">
+              Import Into Pack
+            </button>
+          </form>
+        </Drawer>
+      ) : null}
 
       {pickerMode ? (
         <ProxyPickerDrawer
@@ -841,7 +862,7 @@ export function PacksView(props: PacksViewProps) {
           tags={getTagOptions(props.dashboard.proxies)}
         />
       ) : null}
-    </>
+    </section>
   );
 }
 
@@ -852,7 +873,7 @@ function ProxyPickerDrawer(props: {
   onConfirm: () => void;
   onProtocolFilterChange: (value: string) => void;
   onQueryChange: (value: string) => void;
-  onSelectionChange: React.Dispatch<React.SetStateAction<string[]>>;
+  onSelectionChange: (value: string[]) => void;
   onTagFilterChange: (value: string) => void;
   pickerNodes: ProxySummary[];
   protocolFilter: string;
@@ -862,29 +883,29 @@ function ProxyPickerDrawer(props: {
   tagFilter: string;
   tags: string[];
 }) {
-  const actionableCount =
-    props.mode === "append"
-      ? props.selection.filter((id) => !props.currentPackNodeIds.has(id)).length
-      : props.selection.length;
+  function toggleSelection(proxyId: string) {
+    if (props.selection.includes(proxyId)) {
+      props.onSelectionChange(props.selection.filter((id) => id !== proxyId));
+      return;
+    }
+
+    props.onSelectionChange([...props.selection, proxyId]);
+  }
 
   return (
-    <div className="drawer-backdrop" role="presentation">
-      <aside aria-modal="true" className="drawer-panel" role="dialog">
-        <SectionTitle
-          title={props.mode === "create" ? "Pick starter proxies" : "Add proxies to this pack"}
-          subtitle="Search the existing inventory without leaving the Packs workspace."
-          actions={
-            <button className="ghost-button" onClick={props.onClose} type="button">
-              Close
-            </button>
-          }
-        />
+    <Drawer
+      description="Search the inventory, compare duplicate names by source and tags, and stage the exact nodes you want."
+      onClose={props.onClose}
+      title={props.mode === "create" ? "Pick Proxies For New Pack" : "Add Proxies"}
+      width="wide"
+    >
+      <div className="workspace-stack">
         <div className="toolbar-row">
           <label className="toolbar-field toolbar-field-wide">
             <span className="field-label">Search</span>
             <input
               onChange={(event) => props.onQueryChange(event.target.value)}
-              placeholder="Search by name, tag, source, or protocol"
+              placeholder="Search by name, source, tag, or protocol"
               value={props.query}
             />
           </label>
@@ -920,54 +941,49 @@ function ProxyPickerDrawer(props: {
 
         <div className="picker-list">
           {props.pickerNodes.map((proxy) => {
-            const alreadyInPack = props.mode === "append" && props.currentPackNodeIds.has(proxy.id);
-            const checked = props.selection.includes(proxy.id);
-            const labelSuffix = proxy.tags.join(" ") || proxy.protocol;
+            const isDisabled =
+              props.mode === "append" && props.currentPackNodeIds.has(proxy.id);
+            const isChecked = props.selection.includes(proxy.id);
+
             return (
               <label
-                className={alreadyInPack ? "picker-row picker-row-disabled" : "picker-row"}
+                className={isDisabled ? "picker-row picker-row-disabled" : "picker-row"}
                 key={proxy.id}
               >
                 <input
-                  aria-label={`Pick ${proxy.displayName} ${labelSuffix}`}
-                  checked={checked}
-                  disabled={alreadyInPack}
-                  onChange={() =>
-                    props.onSelectionChange((current) =>
-                      current.includes(proxy.id)
-                        ? current.filter((item) => item !== proxy.id)
-                        : [...current, proxy.id],
-                    )
-                  }
+                  aria-label={`Pick ${proxy.displayName} ${proxy.tags.join(" ") || proxy.protocol}`}
+                  checked={isChecked || isDisabled}
+                  disabled={isDisabled}
+                  onChange={() => toggleSelection(proxy.id)}
                   type="checkbox"
                 />
                 <div className="picker-row-main">
-                  <div className="identity-heading">
+                  <div className="row-heading">
                     <strong>{proxy.displayName}</strong>
                     <ProtocolBadge value={proxy.protocol} />
                   </div>
-                  <p className="supporting compact">Source {proxy.sourceName}</p>
+                  <p className="supporting compact">
+                    {proxy.sourceName} · Updated {formatTime(proxy.updatedAt)}
+                  </p>
                   <div className="token-row">
                     <TagTokens tags={proxy.tags} fallback="No tags" />
                   </div>
                 </div>
-                {alreadyInPack ? <span className="inline-note">Already in pack</span> : null}
+                <span className="inline-note">{isDisabled ? "Already in pack" : "Ready"}</span>
               </label>
             );
           })}
         </div>
 
         <div className="drawer-footer">
-          <span className="supporting">
-            {actionableCount} {actionableCount === 1 ? "proxy" : "proxies"} ready
-          </span>
+          <span className="selection-chip">{props.selection.length} selected</span>
           <button className="primary-button" onClick={props.onConfirm} type="button">
             {props.mode === "create"
-              ? `Use ${actionableCount} ${actionableCount === 1 ? "proxy" : "proxies"}`
-              : `Add ${actionableCount} ${actionableCount === 1 ? "proxy" : "proxies"}`}
+              ? "Apply Selection"
+              : `Add ${props.selection.length} Proxies`}
           </button>
         </div>
-      </aside>
-    </div>
+      </div>
+    </Drawer>
   );
 }
