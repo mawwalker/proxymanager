@@ -50,12 +50,15 @@ Clash.Meta, or sing-box subscriptions.
    - D1 and KV bindings are deployment-time configuration, read from `wrangler.jsonc` by `wrangler deploy`.
    - Runtime variables cannot create or replace a missing D1 or KV binding.
    - After the first deploy, you can verify in Worker `Settings > Bindings` that `DB` and `CACHE` already exist and point to real resources.
+   - The committed `wrangler.jsonc` sets `keep_vars: true`, so GitHub-triggered `wrangler deploy` will keep dashboard-managed runtime variables instead of deleting them on the next deploy.
 
 7. In `Settings > Variables & Secrets`, add only runtime secrets used by the app:
 
    - `ADMIN_USERNAME`
    - `ADMIN_PASSWORD_HASH`
    - `SESSION_SECRET`
+
+   For sensitive values such as `ADMIN_PASSWORD_HASH` and `SESSION_SECRET`, prefer adding them as Secrets in the dashboard instead of plain text Variables.
 
    `SESSION_SECRET` must be a non-empty random string. For example:
 

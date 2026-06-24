@@ -9,6 +9,7 @@ describe("wrangler.jsonc", () => {
     const parsed = JSON.parse(rendered) as {
       assets: { directory: string; not_found_handling: string };
       d1_databases: Array<{ binding: string }>;
+      keep_vars: boolean;
       kv_namespaces: Array<{ binding: string }>;
       main: string;
       name: string;
@@ -17,6 +18,7 @@ describe("wrangler.jsonc", () => {
 
     expect(parsed.name).toBe("proxymanager");
     expect(parsed.main).toBe("src/worker/index.ts");
+    expect(parsed.keep_vars).toBe(true);
     expect(parsed.assets).toEqual({
       directory: "./dist",
       not_found_handling: "single-page-application",
