@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "proxymanager",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-06-24",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  }
+}

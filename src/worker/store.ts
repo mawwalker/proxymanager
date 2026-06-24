@@ -1,3 +1,4 @@
+import { ensureD1Schema } from "@worker/d1-schema";
 import type {
   ExportProfile,
   ImportedNode,
@@ -345,7 +346,7 @@ export function createD1Store(
   db: D1Database,
   now = () => new Date(),
 ): ProxyStore {
-  return {
+  const store: ProxyStore = {
     async addNodesToSubscription(subscriptionId, proxyIds) {
       const items = await this.getSubscriptionItems(subscriptionId);
       const basePosition = items.length;
@@ -691,6 +692,20 @@ export function createD1Store(
       return this.getSubscription(subscriptionId);
     },
   };
+
+  return new Proxy(store, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") {
+        return value;
+      }
+
+      return async (...args: unknown[]) => {
+        await ensureD1Schema(db);
+        return Reflect.apply(value, target, args);
+      };
+    },
+  });
 }
 
 function compareUpdatedAt(

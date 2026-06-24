@@ -18,81 +18,9 @@ Clash.Meta, or sing-box subscriptions.
 
 - Cloudflare Workers + Hono
 - Cloudflare D1 for structured storage
-- Cloudflare KV for future cache expansion
+- Cloudflare KV for lightweight cache and future expansion
 - React + Vite SPA for the admin UI
 - Vitest + Testing Library for automated tests
-
-## Local development
-
-1. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-   If `npm install` tries to compile `sharp` from source on a machine with a globally installed `libvips`, rerun:
-
-   ```bash
-   SHARP_IGNORE_GLOBAL_LIBVIPS=1 npm install
-   ```
-
-2. Create a D1 database and KV namespace:
-
-   ```bash
-   XDG_CONFIG_HOME=.wrangler-home npx wrangler d1 create proxymanager
-   XDG_CONFIG_HOME=.wrangler-home npx wrangler kv namespace create CACHE
-   ```
-
-3. Export build-time variables before running Wrangler locally:
-
-   ```bash
-   export CF_D1_ID="<your-d1-database-id>"
-   export CF_KV_ID="<your-kv-namespace-id>"
-   export CF_WORKER_NAME="proxymanager"
-   export CF_D1_NAME="proxymanager"
-   ```
-
-   Optional:
-
-   ```bash
-   export CF_CRON_SCHEDULE="*/15 * * * *"
-   ```
-
-4. Apply the D1 schema:
-
-   ```bash
-   XDG_CONFIG_HOME=.wrangler-home npx wrangler d1 migrations apply proxymanager --remote
-   ```
-
-5. Create a local `.dev.vars` file for runtime secrets:
-
-   ```dotenv
-   ADMIN_USERNAME=admin
-   ADMIN_PASSWORD_HASH=<sha256-hash>
-   SESSION_SECRET=<long-random-secret>
-   ```
-
-   A committed `.dev.vars.example` template is included for local setup.
-
-   Example password hash command:
-
-   ```bash
-   node -e "crypto.subtle.digest('SHA-256', new TextEncoder().encode(process.argv[1])).then(buf=>console.log(Buffer.from(buf).toString('hex')))" "change-me"
-   ```
-
-6. Start the worker:
-
-   ```bash
-   npm run dev
-   ```
-
-## Verification
-
-```bash
-npm test
-npm run typecheck
-npm run build
-```
 
 ## GitHub import deployment on Cloudflare
 
@@ -101,10 +29,8 @@ npm run build
 3. In `Settings > Build`, set the build command to:
 
    ```bash
-   npm run build:ci
+   npm run build:ui
    ```
-
-   `build:ci` generates an untracked `wrangler.jsonc` from build variables and then builds the SPA. The repository does not store your real resource IDs.
 
 4. Keep the deploy command as Cloudflare's default:
 
@@ -112,40 +38,35 @@ npm run build
    npx wrangler deploy
    ```
 
-5. In the Cloudflare Worker build settings, add build variables:
+5. Do not add any D1 ID or KV ID build variables. The committed `wrangler.jsonc` declares the `DB` and `CACHE` bindings without resource IDs, so Workers Builds can auto-provision them on first deploy.
 
-   - Required: `CF_D1_ID`, `CF_KV_ID`
-   - Optional: `CF_WORKER_NAME`, `CF_D1_NAME`, `CF_CRON_SCHEDULE`
+6. After the first successful deploy, open the Worker in the Cloudflare dashboard and confirm the auto-created bindings:
 
-   These values are only used during the build step to generate `wrangler.jsonc`.
+   - D1 binding: `DB`
+   - KV binding: `CACHE`
 
-6. In `Settings > Variables & Secrets`, add runtime secrets:
+7. In `Settings > Variables & Secrets`, add runtime secrets:
 
    - `ADMIN_USERNAME`
    - `ADMIN_PASSWORD_HASH`
    - `SESSION_SECRET`
 
-7. Make sure your Worker has:
-
-   - D1 binding name: `DB`
-   - KV binding name: `CACHE`
-
-8. Run the D1 migration once before first use:
+   Example password hash command:
 
    ```bash
-   XDG_CONFIG_HOME=.wrangler-home npx wrangler d1 migrations apply proxymanager --remote
+   node -e "crypto.subtle.digest('SHA-256', new TextEncoder().encode(process.argv[1])).then(buf=>console.log(Buffer.from(buf).toString('hex')))" "change-me"
    ```
+
+8. The Worker bootstraps its initial D1 tables on first access. No extra local migration step is required.
 
 9. After that, every push to the connected GitHub branch will trigger an automatic build and deploy.
 
 ## Public repo deployment model
 
-- The repository is safe to keep public because it does not commit real `wrangler.jsonc`, D1 IDs, KV IDs, or runtime secrets.
-- Build-only values such as `CF_D1_ID` and `CF_KV_ID` live in Cloudflare Workers Builds variables.
-- Sensitive runtime values such as `ADMIN_PASSWORD_HASH` and `SESSION_SECRET` live in Cloudflare runtime Secrets.
-- Local-only runtime placeholders can live in `.dev.vars.example` without exposing real credentials.
-- `npm run render:wrangler` generates a local `wrangler.jsonc` on demand for local development or Cloudflare build jobs.
-- On development machines with a system `libvips`, `SHARP_IGNORE_GLOBAL_LIBVIPS=1 npm install` avoids unnecessary `sharp` source builds.
+- The repository is safe to keep public because it does not commit real D1 IDs, KV IDs, or runtime secrets.
+- `wrangler.jsonc` is committed and acts as the deployment source of truth, but it only declares binding names, not resource IDs.
+- On GitHub-import deploys, Cloudflare can auto-provision the D1 and KV resources for `DB` and `CACHE`.
+- Sensitive runtime values such as `ADMIN_PASSWORD_HASH` and `SESSION_SECRET` live only in Cloudflare `Variables & Secrets`.
 
 ## Notes
 
