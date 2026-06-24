@@ -68,6 +68,7 @@ export interface ProxyStore {
     name: string;
     nodeIds: string[];
   }): Promise<StoredSubscription>;
+  deleteSubscription(subscriptionId: string): Promise<void>;
   getDashboard(): Promise<DashboardState>;
   getProxy(id: string): Promise<StoredProxy | null>;
   getSource(id: string): Promise<StoredSource | null>;
@@ -174,6 +175,11 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
       subscriptions.set(subscription.id, subscription);
       await this.addNodesToSubscription(subscription.id, input.nodeIds);
       return subscription;
+    },
+
+    async deleteSubscription(subscriptionId) {
+      subscriptionItems.delete(subscriptionId);
+      subscriptions.delete(subscriptionId);
     },
 
     async getDashboard() {
@@ -452,6 +458,13 @@ export function createD1Store(
         .run();
       await this.addNodesToSubscription(subscription.id, input.nodeIds);
       return subscription;
+    },
+
+    async deleteSubscription(subscriptionId) {
+      await db
+        .prepare("delete from subscriptions where id = ?")
+        .bind(subscriptionId)
+        .run();
     },
 
     async getDashboard() {

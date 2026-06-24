@@ -171,10 +171,33 @@ describe("App", () => {
       await screen.findByRole("dialog", { name: /import links into pack/i }),
     ).toBeInTheDocument();
   });
+
+  it("deletes a pack from settings after confirmation", async () => {
+    mockAppFetch();
+
+    render(<App />);
+    await signIn();
+
+    await userEvent.click(screen.getByRole("button", { name: /^packs$/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /settings/i }));
+    await userEvent.click(screen.getByRole("button", { name: /delete pack/i }));
+
+    expect(
+      await screen.findByRole("dialog", { name: /delete pack/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /confirm delete/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Travel Pack")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/no pack selected/i)).toBeInTheDocument();
+  });
 });
 
 function mockAppFetch() {
   let authenticated = false;
+  let subscriptionDeleted = false;
 
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url =
@@ -192,7 +215,10 @@ function mockAppFetch() {
         });
       }
 
-      return jsonResponse(dashboardFixture);
+      return jsonResponse({
+        ...dashboardFixture,
+        subscriptions: subscriptionDeleted ? [] : dashboardFixture.subscriptions,
+      });
     }
 
     if (url === "/api/session" && method === "POST") {
@@ -201,7 +227,16 @@ function mockAppFetch() {
     }
 
     if (url === "/api/subscriptions/subscription_1" && method === "GET") {
+      if (subscriptionDeleted) {
+        return jsonResponse({ error: "Subscription not found" }, 404);
+      }
+
       return jsonResponse(subscriptionDetailFixture);
+    }
+
+    if (url === "/api/subscriptions/subscription_1" && method === "DELETE") {
+      subscriptionDeleted = true;
+      return jsonResponse({ ok: true });
     }
 
     throw new Error(`Unhandled fetch request: ${method} ${url}`);

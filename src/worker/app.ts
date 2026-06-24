@@ -222,6 +222,16 @@ export function createApp(options: CreateAppOptions): Hono {
     return context.json({ ok: true });
   });
 
+  app.delete("/api/subscriptions/:id", async (context) => {
+    const subscription = await options.store.getSubscription(context.req.param("id"));
+    if (!subscription) {
+      return context.json({ error: "Subscription not found" }, 404);
+    }
+
+    await options.store.deleteSubscription(subscription.id);
+    return context.json({ ok: true });
+  });
+
   app.post("/api/subscriptions/:id/share-token/rotate", async (context) => {
     const subscription = await options.store.rotateSubscriptionShareToken(
       context.req.param("id"),

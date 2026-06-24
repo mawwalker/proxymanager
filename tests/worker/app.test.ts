@@ -343,6 +343,108 @@ describe("ProxyManager worker app", () => {
     expect(rotated.subscription.shareToken).not.toBe(created.subscription.shareToken);
   });
 
+  it("deletes a subscription without deleting inventory proxies", async () => {
+    const store = createMemoryStore();
+    const app = createApp({
+      fetchRemoteContent: async () => {
+        throw new Error("not used");
+      },
+      secrets: {
+        passwordHash: await digest("admin-pass"),
+        sessionSecret: "test-secret",
+        username: "admin",
+      },
+      store,
+    });
+
+    const loginResponse = await app.request("http://worker.test/api/session", {
+      body: JSON.stringify({
+        password: "admin-pass",
+        username: "admin",
+      }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    const sessionCookie = loginResponse.headers.get("set-cookie") ?? "";
+
+    const importResponse = await app.request(
+      "http://worker.test/api/proxies/import",
+      {
+        body: JSON.stringify({
+          content: [
+            "trojan://secret@one.example.com:443?security=tls#One",
+            "vless://44444444-4444-4444-4444-444444444444@two.example.com:443?encryption=none&security=tls#Two",
+          ].join("\n"),
+          kind: "raw",
+        }),
+        headers: {
+          cookie: sessionCookie,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const imported = (await importResponse.json()) as {
+      nodes: Array<{ id: string }>;
+    };
+
+    const createResponse = await app.request(
+      "http://worker.test/api/subscriptions",
+      {
+        body: JSON.stringify({
+          name: "Disposable",
+          nodeIds: imported.nodes.map((node) => node.id),
+        }),
+        headers: {
+          cookie: sessionCookie,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const created = (await createResponse.json()) as {
+      subscription: { id: string };
+    };
+
+    const deleteResponse = await app.request(
+      `http://worker.test/api/subscriptions/${created.subscription.id}`,
+      {
+        headers: {
+          cookie: sessionCookie,
+        },
+        method: "DELETE",
+      },
+    );
+
+    expect(deleteResponse.status).toBe(200);
+    expect(await deleteResponse.json()).toEqual({ ok: true });
+
+    const deletedDetailResponse = await app.request(
+      `http://worker.test/api/subscriptions/${created.subscription.id}`,
+      {
+        headers: {
+          cookie: sessionCookie,
+        },
+      },
+    );
+    expect(deletedDetailResponse.status).toBe(404);
+
+    const dashboardResponse = await app.request("http://worker.test/api/dashboard", {
+      headers: {
+        cookie: sessionCookie,
+      },
+    });
+    const dashboard = (await dashboardResponse.json()) as {
+      proxies: Array<{ id: string }>;
+      subscriptions: Array<{ id: string }>;
+    };
+
+    expect(dashboard.subscriptions).toHaveLength(0);
+    expect(dashboard.proxies).toHaveLength(2);
+  });
+
   it("returns a structured API error when dashboard loading fails", async () => {
     const store = {
       addNodesToSubscription: async () => [],
@@ -352,6 +454,7 @@ describe("ProxyManager worker app", () => {
       createSubscription: async () => {
         throw new Error("not used");
       },
+      deleteSubscription: async () => undefined,
       getDashboard: async () => {
         throw new Error(
           "D1 binding DB is not configured in Cloudflare Worker settings.",

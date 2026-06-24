@@ -53,6 +53,7 @@ export function PacksView(props: PacksViewProps) {
   const [contentTagFilter, setContentTagFilter] = useState("all");
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [showImportDrawer, setShowImportDrawer] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [importForm, setImportForm] = useState({
     content: "",
     kind: "raw" as "clash" | "raw" | "sing-box",
@@ -338,6 +339,25 @@ export function PacksView(props: PacksViewProps) {
       await loadSubscriptionDetail(subscriptionDetail.subscription.id);
       await props.onRefreshDashboard();
       props.onStatusChange("Share token rotated.");
+    } catch (error) {
+      props.onError(error);
+    }
+  }
+
+  async function handleDeletePack() {
+    if (!selectedSubscription) {
+      return;
+    }
+
+    props.onStatusChange("Deleting pack...");
+
+    try {
+      await apiRequest(`/api/subscriptions/${selectedSubscription.id}`, {
+        method: "DELETE",
+      });
+      setShowDeleteDialog(false);
+      await props.onRefreshDashboard();
+      props.onStatusChange("Pack deleted.");
     } catch (error) {
       props.onError(error);
     }
@@ -708,6 +728,20 @@ export function PacksView(props: PacksViewProps) {
                       Rotate Token
                     </button>
                   </div>
+                  <div className="detail-block detail-block-danger">
+                    <span className="detail-label">Danger Zone</span>
+                    <p className="detail-copy">
+                      Delete this pack and its item references. Inventory proxies stay
+                      untouched.
+                    </p>
+                    <button
+                      className="ghost-button danger-button"
+                      onClick={() => setShowDeleteDialog(true)}
+                      type="button"
+                    >
+                      Delete Pack
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </>
@@ -841,6 +875,44 @@ export function PacksView(props: PacksViewProps) {
             </button>
           </form>
         </Drawer>
+      ) : null}
+
+      {showDeleteDialog && selectedSubscription ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            aria-modal="true"
+            aria-labelledby="delete-pack-title"
+            className="modal-card"
+            role="dialog"
+          >
+            <div className="section-title">
+              <div>
+                <h2 id="delete-pack-title">Delete Pack</h2>
+                <p className="supporting compact">
+                  This removes <strong>{selectedSubscription.name}</strong> and{" "}
+                  {selectedSubscription.itemCount} item references. Inventory proxies
+                  stay untouched.
+                </p>
+              </div>
+            </div>
+            <div className="toolbar-actions">
+              <button
+                className="ghost-button"
+                onClick={() => setShowDeleteDialog(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button danger-button"
+                onClick={() => void handleDeletePack()}
+                type="button"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {pickerMode ? (
