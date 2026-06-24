@@ -1,4 +1,5 @@
-const INITIAL_D1_SCHEMA = `
+const INITIAL_D1_SCHEMA_STATEMENTS = [
+  `
 create table if not exists proxy_nodes (
   id text primary key,
   fingerprint text not null unique,
@@ -14,8 +15,9 @@ create table if not exists proxy_nodes (
   share_token text not null unique,
   created_at text not null,
   updated_at text not null
-);
-
+)
+  `.trim(),
+  `
 create table if not exists sources (
   id text primary key,
   name text not null,
@@ -27,14 +29,16 @@ create table if not exists sources (
   last_sync_at text,
   created_at text not null,
   updated_at text not null
-);
-
+)
+  `.trim(),
+  `
 create table if not exists source_nodes (
   source_id text not null references sources(id) on delete cascade,
   proxy_id text not null references proxy_nodes(id) on delete cascade,
   primary key (source_id, proxy_id)
-);
-
+)
+  `.trim(),
+  `
 create table if not exists subscriptions (
   id text primary key,
   name text not null,
@@ -43,26 +47,27 @@ create table if not exists subscriptions (
   default_format text not null default 'raw',
   created_at text not null,
   updated_at text not null
-);
-
+)
+  `.trim(),
+  `
 create table if not exists subscription_items (
   id text primary key,
   subscription_id text not null references subscriptions(id) on delete cascade,
   proxy_id text not null references proxy_nodes(id) on delete cascade,
   position integer not null,
   created_at text not null
-);
-
-create index if not exists idx_proxy_nodes_updated_at on proxy_nodes(updated_at desc);
-create index if not exists idx_sources_updated_at on sources(updated_at desc);
-create index if not exists idx_subscriptions_updated_at on subscriptions(updated_at desc);
-create index if not exists idx_subscription_items_subscription on subscription_items(subscription_id, position);
-`.trim();
+)
+  `.trim(),
+  "create index if not exists idx_proxy_nodes_updated_at on proxy_nodes(updated_at desc)",
+  "create index if not exists idx_sources_updated_at on sources(updated_at desc)",
+  "create index if not exists idx_subscriptions_updated_at on subscriptions(updated_at desc)",
+  "create index if not exists idx_subscription_items_subscription on subscription_items(subscription_id, position)",
+];
 
 const schemaInitByDatabase = new WeakMap<D1Database, Promise<void>>();
 
 export function ensureD1Schema(db: D1Database): Promise<void> {
-  if (!db || typeof db.exec !== "function") {
+  if (!db || typeof db.prepare !== "function") {
     throw new Error(
       "D1 binding DB is not configured in Cloudflare Worker settings.",
     );
@@ -73,8 +78,13 @@ export function ensureD1Schema(db: D1Database): Promise<void> {
     return existing;
   }
 
-  const pending = db
-    .exec(INITIAL_D1_SCHEMA)
+  const pending = INITIAL_D1_SCHEMA_STATEMENTS.reduce<Promise<void>>(
+    (chain, statement) =>
+      chain.then(async () => {
+        await db.prepare(statement).run();
+      }),
+    Promise.resolve(),
+  )
     .then(() => undefined)
     .catch((error) => {
       schemaInitByDatabase.delete(db);

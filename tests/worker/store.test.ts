@@ -12,12 +12,11 @@ describe("createD1Store", () => {
   });
 
   it("bootstraps the schema before serving D1-backed queries", async () => {
-    const execCalls: string[] = [];
     const preparedSql: string[] = [];
+    const runCalls: string[] = [];
+    let activeRuns = 0;
+    let maxConcurrentRuns = 0;
     const db = {
-      exec: async (sql: string) => {
-        execCalls.push(sql);
-      },
       prepare: (sql: string) => {
         preparedSql.push(sql);
         return {
@@ -26,7 +25,14 @@ describe("createD1Store", () => {
             return this;
           },
           first: async () => null,
-          run: async () => ({ success: true }),
+          run: async () => {
+            activeRuns += 1;
+            maxConcurrentRuns = Math.max(maxConcurrentRuns, activeRuns);
+            runCalls.push(sql);
+            await Promise.resolve();
+            activeRuns -= 1;
+            return { success: true };
+          },
         };
       },
     } as unknown as D1Database;
@@ -36,8 +42,17 @@ describe("createD1Store", () => {
     await store.getDashboard();
     await store.getDashboard();
 
-    expect(execCalls).toHaveLength(1);
-    expect(execCalls[0]).toContain("create table if not exists proxy_nodes");
+    expect(runCalls).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("create table if not exists proxy_nodes"),
+        expect.stringContaining("create table if not exists sources"),
+        expect.stringContaining("create table if not exists source_nodes"),
+        expect.stringContaining("create table if not exists subscriptions"),
+        expect.stringContaining("create table if not exists subscription_items"),
+      ]),
+    );
+    expect(runCalls).toHaveLength(9);
+    expect(maxConcurrentRuns).toBe(1);
     expect(preparedSql).toContain("select * from proxy_nodes order by updated_at desc");
   });
 });
