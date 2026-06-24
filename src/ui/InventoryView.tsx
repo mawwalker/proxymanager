@@ -30,6 +30,7 @@ export function InventoryView(props: InventoryViewProps) {
   const [protocolFilter, setProtocolFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [selectedProxyId, setSelectedProxyId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showImportDrawer, setShowImportDrawer] = useState(false);
   const [importForm, setImportForm] = useState({
     content: "",
@@ -127,6 +128,25 @@ export function InventoryView(props: InventoryViewProps) {
       });
       await props.onRefreshDashboard();
       props.onStatusChange("Proxy metadata saved.");
+    } catch (error) {
+      props.onError(error);
+    }
+  }
+
+  async function handleDeleteProxy() {
+    if (!selectedProxy) {
+      return;
+    }
+
+    props.onStatusChange("Deleting proxy...");
+
+    try {
+      await apiRequest(`/api/proxies/${selectedProxy.id}`, {
+        method: "DELETE",
+      });
+      setShowDeleteDialog(false);
+      await props.onRefreshDashboard();
+      props.onStatusChange("Proxy deleted.");
     } catch (error) {
       props.onError(error);
     }
@@ -289,42 +309,59 @@ export function InventoryView(props: InventoryViewProps) {
                 </div>
               </div>
 
-              <form
-                className="stack-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void handleSave();
-                }}
-              >
-                <label>
-                  <span>Name</span>
-                  <input
-                    onChange={(event) =>
-                      setProxyEditor((current) => ({
-                        ...current,
-                        displayName: event.target.value,
-                      }))
-                    }
-                    value={proxyEditor.displayName}
-                  />
-                </label>
-                <label>
-                  <span>Tags</span>
-                  <input
-                    onChange={(event) =>
-                      setProxyEditor((current) => ({
-                        ...current,
-                        tags: event.target.value,
-                      }))
-                    }
-                    placeholder="hk, stream, work"
-                    value={proxyEditor.tags}
-                  />
-                </label>
-                <button className="primary-button" type="submit">
-                  Save Changes
-                </button>
-              </form>
+              <div className="workspace-stack">
+                <form
+                  className="stack-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleSave();
+                  }}
+                >
+                  <label>
+                    <span>Name</span>
+                    <input
+                      onChange={(event) =>
+                        setProxyEditor((current) => ({
+                          ...current,
+                          displayName: event.target.value,
+                        }))
+                      }
+                      value={proxyEditor.displayName}
+                    />
+                  </label>
+                  <label>
+                    <span>Tags</span>
+                    <input
+                      onChange={(event) =>
+                        setProxyEditor((current) => ({
+                          ...current,
+                          tags: event.target.value,
+                        }))
+                      }
+                      placeholder="hk, stream, work"
+                      value={proxyEditor.tags}
+                    />
+                  </label>
+                  <button className="primary-button" type="submit">
+                    Save Changes
+                  </button>
+                </form>
+
+                <div className="detail-block detail-block-danger">
+                  <span className="detail-label">Danger Zone</span>
+                  <p className="detail-copy">
+                    Delete this proxy from inventory and remove it from all packs and
+                    source mappings. Packs and sources stay intact.
+                  </p>
+                  <button
+                    className="ghost-button danger-button"
+                    onClick={() => setShowDeleteDialog(true)}
+                    type="button"
+                  >
+                    Delete Proxy
+                  </button>
+                </div>
+              </div>
             </>
           ) : (
             <EmptyPanel
@@ -377,6 +414,44 @@ export function InventoryView(props: InventoryViewProps) {
             </button>
           </form>
         </Drawer>
+      ) : null}
+
+      {showDeleteDialog && selectedProxy ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            aria-labelledby="delete-proxy-title"
+            aria-modal="true"
+            className="modal-card"
+            role="dialog"
+          >
+            <div className="section-title">
+              <div>
+                <h2 id="delete-proxy-title">Delete Proxy</h2>
+                <p className="supporting compact">
+                  This removes <strong>{selectedProxy.displayName}</strong> from
+                  inventory and from every pack or source mapping. Packs themselves stay
+                  intact.
+                </p>
+              </div>
+            </div>
+            <div className="toolbar-actions">
+              <button
+                className="ghost-button"
+                onClick={() => setShowDeleteDialog(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button danger-button"
+                onClick={() => void handleDeleteProxy()}
+                type="button"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </section>
   );

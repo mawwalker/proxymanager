@@ -116,7 +116,7 @@ describe("App", () => {
     ).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole("button", { name: /edge prime manual-import/i }),
+      await screen.findByRole("button", { name: /edge prime manual-import/i }),
     );
 
     expect(
@@ -193,11 +193,45 @@ describe("App", () => {
     });
     expect(screen.getByText(/no pack selected/i)).toBeInTheDocument();
   });
+
+  it("deletes a proxy from inventory after confirmation", async () => {
+    mockAppFetch();
+
+    render(<App />);
+    await signIn();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /edge prime manual-import/i }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /delete proxy/i }));
+
+    expect(
+      await screen.findByRole("dialog", { name: /delete proxy/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /confirm delete/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: /edge prime manual-import/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    const detailHeading = await screen.findByRole("heading", { name: /proxy details/i });
+    expect(detailHeading).toBeInTheDocument();
+    expect(within(detailHeading.closest("aside")!).getByText("friend-feed")).toBeInTheDocument();
+  });
 });
 
 function mockAppFetch() {
   let authenticated = false;
+  let proxyDeleted = false;
   let subscriptionDeleted = false;
+
+  const remainingProxies = () =>
+    proxyDeleted
+      ? dashboardFixture.proxies.filter((proxy) => proxy.id !== "node_1")
+      : dashboardFixture.proxies;
 
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url =
@@ -217,6 +251,7 @@ function mockAppFetch() {
 
       return jsonResponse({
         ...dashboardFixture,
+        proxies: remainingProxies(),
         subscriptions: subscriptionDeleted ? [] : dashboardFixture.subscriptions,
       });
     }
@@ -231,11 +266,22 @@ function mockAppFetch() {
         return jsonResponse({ error: "Subscription not found" }, 404);
       }
 
-      return jsonResponse(subscriptionDetailFixture);
+      return jsonResponse({
+        ...subscriptionDetailFixture,
+        items: proxyDeleted
+          ? subscriptionDetailFixture.items.filter((item) => item.proxyId !== "node_1")
+          : subscriptionDetailFixture.items,
+        nodes: remainingProxies(),
+      });
     }
 
     if (url === "/api/subscriptions/subscription_1" && method === "DELETE") {
       subscriptionDeleted = true;
+      return jsonResponse({ ok: true });
+    }
+
+    if (url === "/api/proxies/node_1" && method === "DELETE") {
+      proxyDeleted = true;
       return jsonResponse({ ok: true });
     }
 

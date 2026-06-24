@@ -117,6 +117,16 @@ export function createApp(options: CreateAppOptions): Hono {
     return context.json({ proxy });
   });
 
+  app.delete("/api/proxies/:id", async (context) => {
+    const proxy = await options.store.getProxy(context.req.param("id"));
+    if (!proxy) {
+      return context.json({ error: "Proxy not found" }, 404);
+    }
+
+    await options.store.deleteProxy(proxy.id);
+    return context.json({ ok: true });
+  });
+
   app.post("/api/sources", async (context) => {
     const body = sourceSchema.parse(await context.req.json());
     const source = await options.store.createSource(body);

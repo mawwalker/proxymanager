@@ -445,6 +445,190 @@ describe("ProxyManager worker app", () => {
     expect(dashboard.proxies).toHaveLength(2);
   });
 
+  it("deletes a proxy and reindexes remaining pack items", async () => {
+    const store = createMemoryStore();
+    const app = createApp({
+      fetchRemoteContent: async () => {
+        throw new Error("not used");
+      },
+      secrets: {
+        passwordHash: await digest("admin-pass"),
+        sessionSecret: "test-secret",
+        username: "admin",
+      },
+      store,
+    });
+
+    const loginResponse = await app.request("http://worker.test/api/session", {
+      body: JSON.stringify({
+        password: "admin-pass",
+        username: "admin",
+      }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    const sessionCookie = loginResponse.headers.get("set-cookie") ?? "";
+
+    const importResponse = await app.request(
+      "http://worker.test/api/proxies/import",
+      {
+        body: JSON.stringify({
+          content: [
+            "trojan://secret@one.example.com:443?security=tls#One",
+            "vless://44444444-4444-4444-4444-444444444444@two.example.com:443?encryption=none&security=tls#Two",
+            "hy2://pass@three.example.com:443#Three",
+          ].join("\n"),
+          kind: "raw",
+        }),
+        headers: {
+          cookie: sessionCookie,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const imported = (await importResponse.json()) as {
+      nodes: Array<{ id: string }>;
+    };
+
+    const createResponse = await app.request(
+      "http://worker.test/api/subscriptions",
+      {
+        body: JSON.stringify({
+          name: "Travel Pack",
+          nodeIds: imported.nodes.map((node) => node.id),
+        }),
+        headers: {
+          cookie: sessionCookie,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const created = (await createResponse.json()) as {
+      subscription: { id: string };
+    };
+
+    const deleteResponse = await app.request(
+      `http://worker.test/api/proxies/${imported.nodes[1]?.id}`,
+      {
+        headers: {
+          cookie: sessionCookie,
+        },
+        method: "DELETE",
+      },
+    );
+
+    expect(deleteResponse.status).toBe(200);
+    expect(await deleteResponse.json()).toEqual({ ok: true });
+
+    const dashboardResponse = await app.request("http://worker.test/api/dashboard", {
+      headers: {
+        cookie: sessionCookie,
+      },
+    });
+    const dashboard = (await dashboardResponse.json()) as {
+      proxies: Array<{ id: string }>;
+      subscriptions: Array<{ id: string; itemCount: number }>;
+    };
+
+    expect(dashboard.proxies).toHaveLength(2);
+    expect(dashboard.proxies.map((proxy) => proxy.id)).not.toContain(
+      imported.nodes[1]?.id,
+    );
+    expect(dashboard.subscriptions).toEqual([
+      expect.objectContaining({
+        id: created.subscription.id,
+        itemCount: 2,
+      }),
+    ]);
+
+    const detailResponse = await app.request(
+      `http://worker.test/api/subscriptions/${created.subscription.id}`,
+      {
+        headers: {
+          cookie: sessionCookie,
+        },
+      },
+    );
+    const detail = (await detailResponse.json()) as {
+      items: Array<{ position: number; proxyId: string }>;
+    };
+
+    expect(detail.items).toEqual([
+      expect.objectContaining({
+        position: 0,
+        proxyId: imported.nodes[0]?.id,
+      }),
+      expect.objectContaining({
+        position: 1,
+        proxyId: imported.nodes[2]?.id,
+      }),
+    ]);
+
+    const importAnotherResponse = await app.request(
+      "http://worker.test/api/proxies/import",
+      {
+        body: JSON.stringify({
+          content: "trojan://secret@four.example.com:443?security=tls#Four",
+          kind: "raw",
+        }),
+        headers: {
+          cookie: sessionCookie,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const importedAnother = (await importAnotherResponse.json()) as {
+      nodes: Array<{ id: string }>;
+    };
+
+    const addResponse = await app.request(
+      `http://worker.test/api/subscriptions/${created.subscription.id}/items`,
+      {
+        body: JSON.stringify({
+          nodeIds: [importedAnother.nodes[0]?.id],
+        }),
+        headers: {
+          cookie: sessionCookie,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    expect(addResponse.status).toBe(200);
+
+    const updatedDetailResponse = await app.request(
+      `http://worker.test/api/subscriptions/${created.subscription.id}`,
+      {
+        headers: {
+          cookie: sessionCookie,
+        },
+      },
+    );
+    const updatedDetail = (await updatedDetailResponse.json()) as {
+      items: Array<{ position: number; proxyId: string }>;
+    };
+
+    expect(updatedDetail.items).toEqual([
+      expect.objectContaining({
+        position: 0,
+        proxyId: imported.nodes[0]?.id,
+      }),
+      expect.objectContaining({
+        position: 1,
+        proxyId: imported.nodes[2]?.id,
+      }),
+      expect.objectContaining({
+        position: 2,
+        proxyId: importedAnother.nodes[0]?.id,
+      }),
+    ]);
+  });
+
   it("returns a structured API error when dashboard loading fails", async () => {
     const store = {
       addNodesToSubscription: async () => [],
@@ -454,6 +638,7 @@ describe("ProxyManager worker app", () => {
       createSubscription: async () => {
         throw new Error("not used");
       },
+      deleteProxy: async () => undefined,
       deleteSubscription: async () => undefined,
       getDashboard: async () => {
         throw new Error(

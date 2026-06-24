@@ -68,6 +68,7 @@ export interface ProxyStore {
     name: string;
     nodeIds: string[];
   }): Promise<StoredSubscription>;
+  deleteProxy(proxyId: string): Promise<void>;
   deleteSubscription(subscriptionId: string): Promise<void>;
   getDashboard(): Promise<DashboardState>;
   getProxy(id: string): Promise<StoredProxy | null>;
@@ -180,6 +181,45 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
     async deleteSubscription(subscriptionId) {
       subscriptionItems.delete(subscriptionId);
       subscriptions.delete(subscriptionId);
+    },
+
+    async deleteProxy(proxyId) {
+      const proxy = proxies.get(proxyId);
+      if (!proxy) {
+        return;
+      }
+
+      proxies.delete(proxyId);
+      proxyByFingerprint.delete(proxy.fingerprint);
+
+      for (const [sourceId, nodeIds] of sourceNodeIds.entries()) {
+        if (!nodeIds.includes(proxyId)) {
+          continue;
+        }
+
+        sourceNodeIds.set(
+          sourceId,
+          nodeIds.filter((nodeId) => nodeId !== proxyId),
+        );
+        touchSource(sources, sourceId, now);
+      }
+
+      for (const [subscriptionId, items] of subscriptionItems.entries()) {
+        if (!items.some((item) => item.proxyId === proxyId)) {
+          continue;
+        }
+
+        subscriptionItems.set(
+          subscriptionId,
+          items
+            .filter((item) => item.proxyId !== proxyId)
+            .map((item, index) => ({
+              ...item,
+              position: index,
+            })),
+        );
+        touchSubscription(subscriptions, subscriptionId, now);
+      }
     },
 
     async getDashboard() {
@@ -467,6 +507,57 @@ export function createD1Store(
         .run();
     },
 
+    async deleteProxy(proxyId) {
+      const timestamp = now().toISOString();
+      const affectedSubscriptions = await db
+        .prepare(
+          "select distinct subscription_id from subscription_items where proxy_id = ?",
+        )
+        .bind(proxyId)
+        .all<{ subscription_id: string }>();
+      const affectedSources = await db
+        .prepare("select distinct source_id from source_nodes where proxy_id = ?")
+        .bind(proxyId)
+        .all<{ source_id: string }>();
+
+      await db
+        .prepare("delete from subscription_items where proxy_id = ?")
+        .bind(proxyId)
+        .run();
+
+      for (const row of affectedSubscriptions.results ?? []) {
+        const items = await this.getSubscriptionItems(row.subscription_id);
+        for (const [index, item] of items.entries()) {
+          await db
+            .prepare("update subscription_items set position = ? where id = ?")
+            .bind(index, item.id)
+            .run();
+        }
+
+        await db
+          .prepare("update subscriptions set updated_at = ? where id = ?")
+          .bind(timestamp, row.subscription_id)
+          .run();
+      }
+
+      await db
+        .prepare("delete from source_nodes where proxy_id = ?")
+        .bind(proxyId)
+        .run();
+
+      for (const row of affectedSources.results ?? []) {
+        await db
+          .prepare("update sources set updated_at = ? where id = ?")
+          .bind(timestamp, row.source_id)
+          .run();
+      }
+
+      await db
+        .prepare("delete from proxy_nodes where id = ?")
+        .bind(proxyId)
+        .run();
+    },
+
     async getDashboard() {
       const proxies = await db
         .prepare("select * from proxy_nodes order by updated_at desc")
@@ -745,6 +836,22 @@ function touchSubscription(
 
   subscriptions.set(subscriptionId, {
     ...subscription,
+    updatedAt: now().toISOString(),
+  });
+}
+
+function touchSource(
+  sources: Map<string, StoredSource>,
+  sourceId: string,
+  now: () => Date,
+): void {
+  const source = sources.get(sourceId);
+  if (!source) {
+    return;
+  }
+
+  sources.set(sourceId, {
+    ...source,
     updatedAt: now().toISOString(),
   });
 }
