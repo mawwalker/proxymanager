@@ -1,0 +1,383 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+
+:root {
+  color: #f6f1e8;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  line-height: 1.5;
+  background:
+    radial-gradient(circle at top left, rgba(229, 148, 77, 0.25), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(61, 118, 138, 0.24), transparent 22%),
+    linear-gradient(160deg, #171412 0%, #201915 45%, #11181d 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: #f6f1e8;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 0.8rem 0.9rem;
+  background: rgba(12, 15, 20, 0.55);
+  color: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.app-shell,
+.login-shell {
+  min-height: 100vh;
+}
+
+.login-shell {
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.login-panel,
+.card,
+.modal-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 26px;
+  background: rgba(15, 19, 24, 0.74);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+}
+
+.login-panel {
+  width: min(100%, 480px);
+  padding: 2rem;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.sidebar {
+  position: sticky;
+  top: 1.5rem;
+  align-self: start;
+  padding: 1.75rem;
+  border-radius: 28px;
+  background: rgba(15, 18, 24, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.eyebrow {
+  margin: 0 0 0.6rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f2b36e;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.supporting {
+  color: rgba(246, 241, 232, 0.74);
+}
+
+.sidebar-nav,
+.stack-form,
+.share-stack,
+.subscription-list,
+.item-list,
+.proxy-grid,
+.source-grid,
+.sidebar-summary {
+  display: grid;
+  gap: 1rem;
+}
+
+.sidebar-nav {
+  margin: 1.5rem 0;
+}
+
+.nav-chip,
+.subscription-row,
+.proxy-card,
+.item-row,
+.share-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.nav-chip,
+.subscription-row {
+  text-align: left;
+  padding: 0.85rem 1rem;
+  color: inherit;
+}
+
+.nav-chip.is-active,
+.subscription-row.is-active {
+  border-color: rgba(242, 179, 110, 0.5);
+  background: rgba(242, 179, 110, 0.12);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.8rem;
+}
+
+.stat-grid div {
+  padding: 0.9rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.stat-grid dt {
+  color: rgba(246, 241, 232, 0.65);
+  font-size: 0.8rem;
+}
+
+.stat-grid dd {
+  margin: 0.3rem 0 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.4rem;
+}
+
+.content-shell,
+.subscriptions-layout {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.card {
+  padding: 1.5rem;
+}
+
+.section-heading,
+.proxy-card-top,
+.inline-actions,
+.checkbox-row,
+.share-row,
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.primary-button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.85rem 1.15rem;
+  background: linear-gradient(135deg, #f2b36e, #ea7756);
+  color: #1a1411;
+  font-weight: 700;
+}
+
+.status-line {
+  color: rgba(246, 241, 232, 0.65);
+}
+
+.sidebar-summary h2 {
+  font-size: 0.95rem;
+  margin-bottom: 0.45rem;
+}
+
+.sidebar-summary ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: rgba(246, 241, 232, 0.78);
+}
+
+.protocol-pill,
+.status-pill,
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.protocol-pill {
+  background: rgba(72, 134, 156, 0.24);
+  color: #9bd8eb;
+}
+
+.status-success {
+  background: rgba(69, 147, 119, 0.22);
+}
+
+.status-failed {
+  background: rgba(186, 72, 72, 0.22);
+}
+
+.status-idle {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tag.is-muted {
+  color: rgba(246, 241, 232, 0.6);
+}
+
+.proxy-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.proxy-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.checkbox-row {
+  justify-content: flex-start;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
+.editor-panel,
+.warning-list,
+.preview-box,
+.share-value {
+  word-break: break-word;
+}
+
+.editor-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.source-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.subscriptions-layout {
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.subscription-row,
+.item-row {
+  padding: 0.9rem 1rem;
+}
+
+.share-stack {
+  margin-bottom: 1.2rem;
+}
+
+.share-row {
+  padding: 0.9rem 1rem;
+}
+
+.share-value {
+  margin: 0.35rem 0 0;
+  color: rgba(246, 241, 232, 0.72);
+  font-size: 0.9rem;
+}
+
+.preview-box {
+  margin-top: 0.8rem;
+  width: 100%;
+  border-radius: 18px;
+  padding: 0.9rem;
+  background: rgba(4, 6, 8, 0.48);
+}
+
+.warning-list {
+  margin-top: 0.9rem;
+  color: #ffcf9f;
+}
+
+.error-note {
+  color: #ffb2a8;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  text-align: center;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(7, 9, 12, 0.68);
+}
+
+.modal-card {
+  width: min(100%, 520px);
+  padding: 1.4rem;
+}
+
+.modal-card img {
+  display: block;
+  width: min(240px, 100%);
+  margin: 1rem auto;
+  border-radius: 18px;
+  background: white;
+  padding: 0.5rem;
+}
+
+label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+@media (max-width: 960px) {
+  .app-shell,
+  .subscriptions-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+}

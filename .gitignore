@@ -1,0 +1,9 @@
+node_modules
+dist
+.wrangler
+.wrangler-dist
+.wrangler-home
+coverage
+worker-configuration.d.ts
+vitest.workspace.ts
+npm-debug.log*
