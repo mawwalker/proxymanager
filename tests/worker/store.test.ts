@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { createD1Store } from "@worker/store";
 
 describe("createD1Store", () => {
+  it("throws a clear error when the DB binding is missing", async () => {
+    const store = createD1Store(undefined as unknown as D1Database);
+
+    await expect(store.getDashboard()).rejects.toThrow(
+      "D1 binding DB is not configured in Cloudflare Worker settings.",
+    );
+  });
+
   it("bootstraps the schema before serving D1-backed queries", async () => {
     const execCalls: string[] = [];
     const preparedSql: string[] = [];

@@ -1,15 +1,15 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 describe("wrangler.jsonc", () => {
-  it("is committed as a public-safe Cloudflare deployment config", () => {
-    const filePath = resolve(process.cwd(), "wrangler.jsonc");
-    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as {
+  it("is committed as an automatic-provisioning deployment config", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { resolve } = await import("node:path");
+    const rendered = await readFile(resolve(process.cwd(), "wrangler.jsonc"), "utf8");
+
+    const parsed = JSON.parse(rendered) as {
       assets: { directory: string; not_found_handling: string };
-      d1_databases: Array<{ binding: string; database_id?: string; database_name?: string }>;
-      kv_namespaces: Array<{ binding: string; id?: string }>;
+      d1_databases: Array<{ binding: string }>;
+      kv_namespaces: Array<{ binding: string }>;
       main: string;
       name: string;
       triggers: { crons: string[] };

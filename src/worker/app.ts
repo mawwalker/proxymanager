@@ -57,6 +57,20 @@ const subscriptionItemsSchema = z.object({
 export function createApp(options: CreateAppOptions): Hono {
   const app = new Hono();
 
+  app.onError((error, context) => {
+    if (context.req.path.startsWith("/api/")) {
+      return context.json(
+        {
+          error:
+            error instanceof Error ? error.message : "Internal Server Error",
+        },
+        500,
+      );
+    }
+
+    return context.text("Internal Server Error", 500);
+  });
+
   app.post("/api/session", async (context) => {
     const body = loginSchema.parse(await context.req.json());
     const ok = await verifyCredentials(options.secrets, body);

@@ -62,6 +62,12 @@ create index if not exists idx_subscription_items_subscription on subscription_i
 const schemaInitByDatabase = new WeakMap<D1Database, Promise<void>>();
 
 export function ensureD1Schema(db: D1Database): Promise<void> {
+  if (!db || typeof db.exec !== "function") {
+    throw new Error(
+      "D1 binding DB is not configured in Cloudflare Worker settings.",
+    );
+  }
+
   const existing = schemaInitByDatabase.get(db);
   if (existing) {
     return existing;

@@ -38,14 +38,20 @@ Clash.Meta, or sing-box subscriptions.
    npx wrangler deploy
    ```
 
-5. Do not add any D1 ID or KV ID build variables. The committed `wrangler.jsonc` declares the `DB` and `CACHE` bindings without resource IDs, so Workers Builds can auto-provision them on first deploy.
+5. The committed `wrangler.jsonc` declares only the binding names:
 
-6. After the first successful deploy, open the Worker in the Cloudflare dashboard and confirm the auto-created bindings:
+   - D1 binding name: `DB`
+   - KV binding name: `CACHE`
 
-   - D1 binding: `DB`
-   - KV binding: `CACHE`
+   With Cloudflare automatic resource provisioning enabled, the first GitHub deploy can create the real D1 and KV resources and attach these bindings automatically.
 
-7. In `Settings > Variables & Secrets`, add runtime secrets:
+6. Do not add D1 IDs, KV IDs, `D1_NAME`, or similar values in `Build` variables or `Variables & Secrets`.
+
+   - D1 and KV bindings are deployment-time configuration, read from `wrangler.jsonc` by `wrangler deploy`.
+   - Runtime variables cannot create or replace a missing D1 or KV binding.
+   - After the first deploy, you can verify in Worker `Settings > Bindings` that `DB` and `CACHE` already exist and point to real resources.
+
+7. In `Settings > Variables & Secrets`, add only runtime secrets used by the app:
 
    - `ADMIN_USERNAME`
    - `ADMIN_PASSWORD_HASH`
@@ -57,15 +63,14 @@ Clash.Meta, or sing-box subscriptions.
    node -e "crypto.subtle.digest('SHA-256', new TextEncoder().encode(process.argv[1])).then(buf=>console.log(Buffer.from(buf).toString('hex')))" "change-me"
    ```
 
-8. The Worker bootstraps its initial D1 tables on first access. No extra local migration step is required.
+8. The Worker bootstraps its initial D1 tables on first access. No extra migration command is required.
 
 9. After that, every push to the connected GitHub branch will trigger an automatic build and deploy.
 
 ## Public repo deployment model
 
 - The repository is safe to keep public because it does not commit real D1 IDs, KV IDs, or runtime secrets.
-- `wrangler.jsonc` is committed and acts as the deployment source of truth, but it only declares binding names, not resource IDs.
-- On GitHub-import deploys, Cloudflare can auto-provision the D1 and KV resources for `DB` and `CACHE`.
+- `wrangler.jsonc` is committed and declares only binding names, which works with Cloudflare's automatic resource provisioning for KV and D1.
 - Sensitive runtime values such as `ADMIN_PASSWORD_HASH` and `SESSION_SECRET` live only in Cloudflare `Variables & Secrets`.
 
 ## Notes

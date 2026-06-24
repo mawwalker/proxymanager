@@ -334,6 +334,70 @@ describe("ProxyManager worker app", () => {
 
     expect(rotated.subscription.shareToken).not.toBe(created.subscription.shareToken);
   });
+
+  it("returns a structured API error when dashboard loading fails", async () => {
+    const store = {
+      addNodesToSubscription: async () => [],
+      createSource: async () => {
+        throw new Error("not used");
+      },
+      createSubscription: async () => {
+        throw new Error("not used");
+      },
+      getDashboard: async () => {
+        throw new Error(
+          "D1 binding DB is not configured in Cloudflare Worker settings.",
+        );
+      },
+      getProxy: async () => null,
+      getSource: async () => null,
+      getSubscription: async () => null,
+      getSubscriptionByShareToken: async () => null,
+      getSubscriptionItems: async () => [],
+      getSubscriptionNodes: async () => [],
+      importNodes: async () => [],
+      removeSubscriptionItem: async () => undefined,
+      replaceSourceNodes: async () => [],
+      rotateSubscriptionShareToken: async () => null,
+      updateProxyMetadata: async () => null,
+      updateSourceSyncState: async () => null,
+      updateSubscription: async () => null,
+    };
+    const app = createApp({
+      fetchRemoteContent: async () => {
+        throw new Error("not used");
+      },
+      secrets: {
+        passwordHash: await digest("admin-pass"),
+        sessionSecret: "test-secret",
+        username: "admin",
+      },
+      store,
+    });
+
+    const loginResponse = await app.request("http://worker.test/api/session", {
+      body: JSON.stringify({
+        password: "admin-pass",
+        username: "admin",
+      }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    const sessionCookie = loginResponse.headers.get("set-cookie") ?? "";
+
+    const dashboardResponse = await app.request("http://worker.test/api/dashboard", {
+      headers: {
+        cookie: sessionCookie,
+      },
+    });
+
+    expect(dashboardResponse.status).toBe(500);
+    expect(await dashboardResponse.json()).toEqual({
+      error: "D1 binding DB is not configured in Cloudflare Worker settings.",
+    });
+  });
 });
 
 async function digest(value: string): Promise<string> {

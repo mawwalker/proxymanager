@@ -84,4 +84,35 @@ describe("App", () => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
   });
+
+  it("shows the backend error when dashboard loading fails after login", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
+      .mockResolvedValueOnce(
+        new Response("D1 binding DB is not configured in Cloudflare Worker settings.", {
+          status: 500,
+        }),
+      );
+
+    render(<App />);
+
+    expect(
+      await screen.findByRole("heading", { name: /admin access/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/username/i), "admin");
+    await userEvent.type(screen.getByLabelText(/password/i), "admin-pass");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(
+      await screen.findByText(
+        "D1 binding DB is not configured in Cloudflare Worker settings.",
+      ),
+    ).toBeInTheDocument();
+  });
 });

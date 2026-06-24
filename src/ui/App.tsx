@@ -167,6 +167,11 @@ export function App() {
       return;
     }
 
+    if (!response.ok) {
+      const payload = await response.text();
+      throw new Error(payload || `Request failed with ${response.status}`);
+    }
+
     const data = (await response.json()) as DashboardState;
     startTransition(() => {
       setDashboard(data);
