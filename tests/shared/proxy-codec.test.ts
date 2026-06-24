@@ -96,6 +96,60 @@ proxies:
 });
 
 describe("exportSubscriptionProfile", () => {
+  it("rewrites raw share links with the edited name and tags", async () => {
+    const vmessPayload = Buffer.from(
+      JSON.stringify({
+        v: "2",
+        ps: "Old VMess",
+        add: "vmess.example.com",
+        port: "443",
+        id: "99999999-9999-9999-9999-999999999999",
+        aid: "0",
+        net: "ws",
+        type: "none",
+        host: "cdn.example.com",
+        path: "/ws",
+        tls: "tls",
+      }),
+      "utf8",
+    ).toString("base64");
+    const imported = await importProxyCollection({
+      content: [
+        "vless://11111111-1111-1111-1111-111111111111@hk.example.com:443?encryption=none&security=tls&sni=hk.example.com&fp=chrome#Old%20VLESS",
+        `vmess://${vmessPayload}`,
+      ].join("\n"),
+      kind: "raw",
+      sourceName: "raw-links",
+    });
+
+    imported.nodes[0] = {
+      ...imported.nodes[0]!,
+      displayName: "Proxy1",
+      tags: ["tag1", "tag2"],
+    };
+    imported.nodes[1] = {
+      ...imported.nodes[1]!,
+      displayName: "Proxy2",
+      tags: ["tag1", "tag2"],
+    };
+
+    const result = exportSubscriptionProfile("raw", imported.nodes);
+    const lines = result.content.split("\n");
+    const vmessExport = JSON.parse(
+      Buffer.from(lines[1]!.slice("vmess://".length), "base64").toString("utf8"),
+    ) as { host: string; path: string; ps: string };
+
+    expect(lines[0]).toContain("fp=chrome");
+    expect(lines[0]).toContain("#Proxy1_tag1_tag2");
+    expect(vmessExport).toEqual(
+      expect.objectContaining({
+        host: "cdn.example.com",
+        path: "/ws",
+        ps: "Proxy2_tag1_tag2",
+      }),
+    );
+  });
+
   it("builds a clash-meta profile and reports skipped nodes", async () => {
     const imported = await importProxyCollection({
       content: [
@@ -123,10 +177,15 @@ describe("exportSubscriptionProfile", () => {
         extras: {},
       },
     });
+    imported.nodes[0] = {
+      ...imported.nodes[0]!,
+      tags: ["hk", "stream"],
+    };
 
     const result = exportSubscriptionProfile("clash-meta", imported.nodes);
 
     expect(result.content).toContain("proxies:");
+    expect(result.content).toContain("name: HK_hk_stream");
     expect(result.content).toContain("type: vless");
     expect(result.content).toContain("type: tuic");
     expect(result.skipped).toEqual([
@@ -147,6 +206,10 @@ describe("exportSubscriptionProfile", () => {
       kind: "raw",
       sourceName: "sing-box-ready",
     });
+    imported.nodes[0] = {
+      ...imported.nodes[0]!,
+      tags: ["beta"],
+    };
 
     const result = exportSubscriptionProfile("sing-box", imported.nodes);
     const parsed = JSON.parse(result.content) as {
@@ -156,7 +219,7 @@ describe("exportSubscriptionProfile", () => {
     expect(parsed.outbounds[0]?.type).toBe("selector");
     expect(parsed.outbounds).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ type: "trojan", tag: "SG" }),
+        expect.objectContaining({ type: "trojan", tag: "SG_beta" }),
         expect.objectContaining({ type: "socks", tag: "SOCKS" }),
       ]),
     );

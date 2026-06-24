@@ -1,8 +1,9 @@
 import { ensureD1Schema } from "@worker/d1-schema";
-import type {
-  ExportProfile,
-  ImportedNode,
-  ImportKind,
+import {
+  renderNodeShareUri,
+  type ExportProfile,
+  type ImportedNode,
+  type ImportKind,
 } from "@shared/proxy-codec";
 
 export interface StoredProxy extends ImportedNode {
@@ -177,7 +178,9 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
 
     async getDashboard() {
       return {
-        proxies: Array.from(proxies.values()).sort(compareUpdatedAt),
+        proxies: Array.from(proxies.values())
+          .sort(compareUpdatedAt)
+          .map(toStoredProxyForOutput),
         sources: Array.from(sources.values()).sort(compareUpdatedAt),
         subscriptions: Array.from(subscriptions.values())
           .sort(compareUpdatedAt)
@@ -189,7 +192,8 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
     },
 
     async getProxy(id) {
-      return proxies.get(id) ?? null;
+      const proxy = proxies.get(id);
+      return proxy ? toStoredProxyForOutput(proxy) : null;
     },
 
     async getSource(id) {
@@ -217,7 +221,8 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
       return items
         .sort((left, right) => left.position - right.position)
         .map((item) => proxies.get(item.proxyId))
-        .filter((item): item is StoredProxy => item !== undefined);
+        .filter((item): item is StoredProxy => item !== undefined)
+        .map(toStoredProxyForOutput);
     },
 
     async importNodes(nodes) {
@@ -241,7 +246,7 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
             updatedAt: timestamp,
           };
           proxies.set(existingId, updated);
-          return updated;
+          return toStoredProxyForOutput(updated);
         }
 
         const created: StoredProxy = {
@@ -252,7 +257,7 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
         };
         proxies.set(created.id, created);
         proxyByFingerprint.set(created.fingerprint, created.id);
-        return created;
+        return toStoredProxyForOutput(created);
       });
     },
 
@@ -305,7 +310,7 @@ export function createMemoryStore(now = () => new Date()): ProxyStore {
         updatedAt: now().toISOString(),
       };
       proxies.set(proxyId, updated);
-      return updated;
+      return toStoredProxyForOutput(updated);
     },
 
     async updateSourceSyncState(sourceId, input) {
@@ -793,7 +798,7 @@ interface SubscriptionRow {
 }
 
 function rowToProxy(row: ProxyRow): StoredProxy {
-  return {
+  return toStoredProxyForOutput({
     createdAt: row.created_at,
     displayName: row.display_name,
     enabled: Boolean(row.enabled),
@@ -808,6 +813,13 @@ function rowToProxy(row: ProxyRow): StoredProxy {
     sourceName: row.source_name,
     tags: JSON.parse(row.tags_json) as string[],
     updatedAt: row.updated_at,
+  });
+}
+
+function toStoredProxyForOutput(proxy: StoredProxy): StoredProxy {
+  return {
+    ...proxy,
+    shareUri: renderNodeShareUri(proxy) ?? proxy.shareUri,
   };
 }
 

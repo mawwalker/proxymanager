@@ -73,6 +73,11 @@ export interface ExportSubscriptionProfileResult {
   skipped: ExportSkippedItem[];
 }
 
+type ExportableNode = Pick<
+  ImportedNode,
+  "displayName" | "protocol" | "rawPayload" | "shareUri" | "tags"
+>;
+
 export async function importProxyCollection(
   input: ImportProxyCollectionInput,
 ): Promise<ImportProxyCollectionResult> {
@@ -111,7 +116,7 @@ export function exportSubscriptionProfile(
 ): ExportSubscriptionProfileResult {
   if (profile === "raw") {
     const content = nodes
-      .map((node) => node.shareUri ?? node.rawPayload)
+      .map((node) => renderNodeShareUri(node) ?? node.rawPayload)
       .join("\n");
 
     return {
@@ -431,13 +436,14 @@ function serializeShareUri(normalized: NormalizedProxy): string | null {
 
 function toClashProxy(node: ImportedNode): Record<string, unknown> | null {
   const n = node.normalized;
+  const exportName = buildExportName(node);
   if (!n.server || !n.port) {
     return null;
   }
 
   if (node.protocol === "vless") {
     return {
-      name: node.displayName,
+      name: exportName,
       type: "vless",
       server: n.server,
       port: n.port,
@@ -451,7 +457,7 @@ function toClashProxy(node: ImportedNode): Record<string, unknown> | null {
 
   if (node.protocol === "trojan") {
     return {
-      name: node.displayName,
+      name: exportName,
       type: "trojan",
       server: n.server,
       port: n.port,
@@ -462,7 +468,7 @@ function toClashProxy(node: ImportedNode): Record<string, unknown> | null {
 
   if (node.protocol === "tuic") {
     return {
-      name: node.displayName,
+      name: exportName,
       type: "tuic",
       server: n.server,
       port: n.port,
@@ -474,7 +480,7 @@ function toClashProxy(node: ImportedNode): Record<string, unknown> | null {
 
   if (node.protocol === "socks" || node.protocol === "http") {
     return {
-      name: node.displayName,
+      name: exportName,
       type: node.protocol,
       server: n.server,
       port: n.port,
@@ -485,7 +491,7 @@ function toClashProxy(node: ImportedNode): Record<string, unknown> | null {
 
   if (node.protocol === "vmess") {
     return {
-      name: node.displayName,
+      name: exportName,
       type: "vmess",
       server: n.server,
       port: n.port,
@@ -501,7 +507,7 @@ function toClashProxy(node: ImportedNode): Record<string, unknown> | null {
 
   if (node.protocol === "hy2") {
     return {
-      name: node.displayName,
+      name: exportName,
       type: "hysteria2",
       server: n.server,
       port: n.port,
@@ -515,6 +521,7 @@ function toClashProxy(node: ImportedNode): Record<string, unknown> | null {
 
 function toSingBoxOutbound(node: ImportedNode): Record<string, unknown> | null {
   const n = node.normalized;
+  const exportName = buildExportName(node);
   if (!n.server || !n.port) {
     return null;
   }
@@ -522,7 +529,7 @@ function toSingBoxOutbound(node: ImportedNode): Record<string, unknown> | null {
   if (node.protocol === "trojan") {
     return {
       type: "trojan",
-      tag: node.displayName,
+      tag: exportName,
       server: n.server,
       server_port: n.port,
       password: n.password,
@@ -536,7 +543,7 @@ function toSingBoxOutbound(node: ImportedNode): Record<string, unknown> | null {
   if (node.protocol === "socks") {
     return {
       type: "socks",
-      tag: node.displayName,
+      tag: exportName,
       server: n.server,
       server_port: n.port,
       username: n.username,
@@ -547,7 +554,7 @@ function toSingBoxOutbound(node: ImportedNode): Record<string, unknown> | null {
   if (node.protocol === "vless") {
     return {
       type: "vless",
-      tag: node.displayName,
+      tag: exportName,
       server: n.server,
       server_port: n.port,
       uuid: n.uuid,
@@ -569,7 +576,7 @@ function toSingBoxOutbound(node: ImportedNode): Record<string, unknown> | null {
   if (node.protocol === "hy2") {
     return {
       type: "hysteria2",
-      tag: node.displayName,
+      tag: exportName,
       server: n.server,
       server_port: n.port,
       password: n.password,
@@ -583,7 +590,7 @@ function toSingBoxOutbound(node: ImportedNode): Record<string, unknown> | null {
   if (node.protocol === "http") {
     return {
       type: "http",
-      tag: node.displayName,
+      tag: exportName,
       server: n.server,
       server_port: n.port,
       username: n.username,
@@ -592,6 +599,41 @@ function toSingBoxOutbound(node: ImportedNode): Record<string, unknown> | null {
   }
 
   return null;
+}
+
+export function buildExportName(node: Pick<ImportedNode, "displayName" | "tags">): string {
+  const sanitizedTags = node.tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0);
+  if (sanitizedTags.length === 0) {
+    return node.displayName;
+  }
+
+  return `${node.displayName}_${sanitizedTags.join("_")}`;
+}
+
+export function renderNodeShareUri(node: ExportableNode): string | null {
+  if (!node.shareUri) {
+    return null;
+  }
+
+  const exportName = buildExportName(node);
+  if (node.protocol === "vmess" && node.shareUri.startsWith("vmess://")) {
+    try {
+      const payload = node.shareUri.slice("vmess://".length);
+      const parsed = JSON.parse(decodeBase64(payload)) as Record<string, string>;
+      parsed.ps = exportName;
+      return `vmess://${encodeBase64(JSON.stringify(parsed))}`;
+    } catch {
+      return node.shareUri;
+    }
+  }
+
+  try {
+    const url = new URL(node.shareUri);
+    url.hash = exportName;
+    return url.toString();
+  } catch {
+    return node.shareUri;
+  }
 }
 
 function maybeDecodeBase64Subscription(content: string): string {

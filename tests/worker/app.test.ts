@@ -75,10 +75,11 @@ describe("ProxyManager worker app", () => {
 
     expect(patchResponse.status).toBe(200);
     const patched = (await patchResponse.json()) as {
-      proxy: { displayName: string; tags: string[] };
+      proxy: { displayName: string; shareUri: string | null; tags: string[] };
     };
     expect(patched.proxy.displayName).toBe("Edge Prime");
     expect(patched.proxy.tags).toEqual(["hk", "stream"]);
+    expect(patched.proxy.shareUri).toContain("#Edge%20Prime_hk_stream");
 
     const subscriptionResponse = await app.request(
       "http://worker.test/api/subscriptions",
@@ -107,7 +108,14 @@ describe("ProxyManager worker app", () => {
     expect(publicExport.status).toBe(200);
     const yaml = await publicExport.text();
     expect(yaml).toContain("ProxyManager");
-    expect(yaml).toContain("Edge Prime");
+    expect(yaml).toContain("Edge Prime_hk_stream");
+
+    const rawExport = await app.request(
+      `http://worker.test/share/sub/${subscriptionBody.subscription.shareToken}?format=raw`,
+    );
+
+    expect(rawExport.status).toBe(200);
+    expect(await rawExport.text()).toContain("#Edge%20Prime_hk_stream");
   });
 
   it("creates a remote source and syncs imported nodes", async () => {
