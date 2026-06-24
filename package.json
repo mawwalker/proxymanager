@@ -5,9 +5,11 @@
   "type": "module",
   "description": "Cloudflare Worker proxy and subscription manager",
   "scripts": {
-    "dev": "XDG_CONFIG_HOME=.wrangler-home wrangler dev",
+    "render:wrangler": "node scripts/render-wrangler.mjs",
+    "dev": "npm run render:wrangler && XDG_CONFIG_HOME=.wrangler-home wrangler dev",
     "build:ui": "vite build",
-    "build": "npm run build:ui && XDG_CONFIG_HOME=.wrangler-home wrangler deploy --dry-run --outdir .wrangler-dist",
+    "build:ci": "npm run render:wrangler && npm run build:ui",
+    "build": "npm run build:ci && XDG_CONFIG_HOME=.wrangler-home wrangler deploy --dry-run --outdir .wrangler-dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -41,6 +43,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
     "vitest": "^4.1.9",
-    "wrangler": "^3.114.12"
+    "wrangler": "^4.104.0"
   }
 }

@@ -3,7 +3,10 @@ dist
 .wrangler
 .wrangler-dist
 .wrangler-home
+.dev.vars*
+!.dev.vars.example
 coverage
+wrangler.jsonc
 worker-configuration.d.ts
 vitest.workspace.ts
 npm-debug.log*

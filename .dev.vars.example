@@ -1,0 +1,4 @@
+# Local runtime secrets for `wrangler dev`
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=<sha256-hex-password-hash>
+SESSION_SECRET=<long-random-secret>
