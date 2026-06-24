@@ -7,6 +7,16 @@ export interface AuthSecrets {
   username: string;
 }
 
+export function requireSessionSecret(secret: string): string {
+  if (typeof secret !== "string" || secret.trim().length === 0) {
+    throw new Error(
+      "SESSION_SECRET must be configured as a non-empty secret in Cloudflare Variables & Secrets.",
+    );
+  }
+
+  return secret;
+}
+
 export function requireAuth(secrets: AuthSecrets): MiddlewareHandler {
   return async (context, next) => {
     const cookie = getCookie(context, "pm_session");
@@ -79,9 +89,10 @@ async function verifySessionCookie(
 }
 
 async function sign(value: string, secret: string): Promise<string> {
+  const sessionSecret = requireSessionSecret(secret);
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(secret),
+    new TextEncoder().encode(sessionSecret),
     { hash: "SHA-256", name: "HMAC" },
     false,
     ["sign"],

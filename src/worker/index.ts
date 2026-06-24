@@ -1,4 +1,5 @@
 import { createApp } from "@worker/app";
+import { requireSessionSecret } from "@worker/auth";
 import { createD1Store } from "@worker/store";
 
 export interface CloudflareEnv {
@@ -74,9 +75,10 @@ async function createSystemSession(env: CloudflareEnv): Promise<string> {
     username: env.ADMIN_USERNAME,
   };
   const encoded = encodeBase64Url(JSON.stringify(payload));
+  const sessionSecret = requireSessionSecret(env.SESSION_SECRET);
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(env.SESSION_SECRET),
+    new TextEncoder().encode(sessionSecret),
     { hash: "SHA-256", name: "HMAC" },
     false,
     ["sign"],

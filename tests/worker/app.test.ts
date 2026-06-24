@@ -398,6 +398,37 @@ describe("ProxyManager worker app", () => {
       error: "D1 binding DB is not configured in Cloudflare Worker settings.",
     });
   });
+
+  it("returns a clear error when SESSION_SECRET is empty", async () => {
+    const app = createApp({
+      fetchRemoteContent: async () => {
+        throw new Error("not used");
+      },
+      secrets: {
+        passwordHash: await digest("admin-pass"),
+        sessionSecret: "",
+        username: "admin",
+      },
+      store: createMemoryStore(),
+    });
+
+    const loginResponse = await app.request("http://worker.test/api/session", {
+      body: JSON.stringify({
+        password: "admin-pass",
+        username: "admin",
+      }),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+
+    expect(loginResponse.status).toBe(500);
+    expect(await loginResponse.json()).toEqual({
+      error:
+        "SESSION_SECRET must be configured as a non-empty secret in Cloudflare Variables & Secrets.",
+    });
+  });
 });
 
 async function digest(value: string): Promise<string> {

@@ -57,6 +57,12 @@ Clash.Meta, or sing-box subscriptions.
    - `ADMIN_PASSWORD_HASH`
    - `SESSION_SECRET`
 
+   `SESSION_SECRET` must be a non-empty random string. For example:
+
+   ```bash
+   node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+   ```
+
    Example password hash command:
 
    ```bash
